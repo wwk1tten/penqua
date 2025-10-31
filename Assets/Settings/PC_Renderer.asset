@@ -68,7 +68,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f62c9c65cf3354c93be831c8bc075510, type: 3}
   m_Name: ScreenSpaceAmbientOcclusion
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.ScreenSpaceAmbientOcclusion
-  m_Active: 0
+  m_Active: 1
   m_Settings:
     AOMethod: 0
     Downsample: 0
@@ -94,7 +94,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1da1f5b1f37e9b34da4c29c89838dc59, type: 3}
   m_Name: Underwater Effects
   m_EditorClassIdentifier: Assembly-CSharp::Underwater
-  m_Active: 1
+  m_Active: 0
   settings:
     material: {fileID: 2100000, guid: d7eff91adf883494db9dbd5fd180ae71, type: 2}
     renderPassEvent: 400

@@ -1,4 +1,4 @@
-﻿ using UnityEngine;
+﻿using UnityEngine;
 #if ENABLE_INPUT_SYSTEM 
 using UnityEngine.InputSystem;
 #endif
@@ -26,7 +26,7 @@ namespace StarterAssets
         public float RotationSmoothTime = 0.12f;
 
         [Tooltip("Acceleration and deceleration")]
-        public float SpeedChangeRate = 10.0f;
+        public float SpeedChangeRate = 30.0f;
 
         public AudioClip LandingAudioClip;
         public AudioClip[] FootstepAudioClips;
@@ -75,6 +75,12 @@ namespace StarterAssets
         [Tooltip("For locking the camera position on all axis")]
         public bool LockCameraPosition = false;
 
+        [Header("Swimming")]
+        [SerializeField] private LayerMask waterMask;
+        [SerializeField] private float swimSpeed = 0.02f;
+        private bool _isSwimming = false;
+
+
         // cinemachine
         private float _cinemachineTargetYaw;
         private float _cinemachineTargetPitch;
@@ -97,6 +103,7 @@ namespace StarterAssets
         private int _animIDJump;
         private int _animIDFreeFall;
         private int _animIDMotionSpeed;
+        private int _animIDIsSwimming;
 
 #if ENABLE_INPUT_SYSTEM 
         private PlayerInput _playerInput;
@@ -159,6 +166,12 @@ namespace StarterAssets
             JumpAndGravity();
             GroundedCheck();
             Move();
+
+            // 수영 상태 Animator 업데이트
+            if (_hasAnimator)
+            {
+                _animator.SetBool(_animIDIsSwimming, _isSwimming);
+            }
         }
 
         private void LateUpdate()
@@ -173,6 +186,7 @@ namespace StarterAssets
             _animIDJump = Animator.StringToHash("Jump");
             _animIDFreeFall = Animator.StringToHash("FreeFall");
             _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
+            _animIDIsSwimming = Animator.StringToHash("isSwimming");
         }
 
         private void GroundedCheck()
@@ -214,7 +228,18 @@ namespace StarterAssets
         private void Move()
         {
             // set target speed based on move speed, sprint speed and if sprint is pressed
-            float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
+            float targetSpeed;
+
+            if (_isSwimming)
+            {
+                targetSpeed = swimSpeed; // 수영 속도
+            }
+            else
+            {
+                targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
+                Debug.Log("targetSpeed : " + targetSpeed );
+                Debug.Log("swimSpeed : " + swimSpeed);
+            }
 
             // a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
 
@@ -277,6 +302,8 @@ namespace StarterAssets
                 _animator.SetFloat(_animIDSpeed, _animationBlend);
                 _animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
             }
+
+            
         }
 
         private void JumpAndGravity()
@@ -386,6 +413,25 @@ namespace StarterAssets
             if (animationEvent.animatorClipInfo.weight > 0.5f)
             {
                 AudioSource.PlayClipAtPoint(LandingAudioClip, transform.TransformPoint(_controller.center), FootstepAudioVolume);
+            }
+        }
+        // water entered
+        private void OnTriggerEnter(Collider other)
+        {
+            if ((waterMask & (1 << other.gameObject.layer)) != 0)
+            {
+                _isSwimming = true;
+                _animator.SetBool("isSwimming", _isSwimming);
+                Debug.Log("isSwimming");
+
+            }
+        }
+
+        private void OnTriggerExit(Collider other)
+        {
+            if ((waterMask & (1 << other.gameObject.layer)) != 0)
+            {
+                _isSwimming = false;
             }
         }
     }
