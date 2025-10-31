@@ -1,7 +1,7 @@
 fileFormatVersion: 2
-guid: 34f30712d30697648b80843f9e09934c
+guid: 1c77555fce85aa74da16fd6cadfac6b8
 ModelImporter:
-  serializedVersion: 19301
+  serializedVersion: 20200
   internalIDToNameTable:
   - first:
       74: 6720303635017113406
@@ -61,8 +61,8 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: M_Sparrow
-    second: {fileID: 2100000, guid: 797669773fa10544383b7822df49f5d9, type: 2}
+      name: M_Alpaca
+    second: {fileID: 2100000, guid: 3898d9a8370af9a4bba9dc6a2d84bced, type: 2}
   materials:
     materialImportMode: 1
     materialName: 1
@@ -86,7 +86,7 @@ ModelImporter:
     animationRotationError: 0.5
     animationPositionError: 0.5
     animationScaleError: 0.5
-    animationWrapMode: 0
+    animationWrapMode: 2
     extraExposedTransformPaths: []
     extraUserProperties: []
     clipAnimations:
@@ -612,7 +612,7 @@ ModelImporter:
       maskType: 3
       maskSource: {instanceID: 0}
       additiveReferencePoseFrame: 0
-    isReadable: 0
+    isReadable: 1
   meshes:
     lODScreenPercentages: []
     globalScale: 1
@@ -630,6 +630,7 @@ ModelImporter:
     useFileUnits: 1
     keepQuads: 0
     weldVertices: 1
+    bakeAxisConversion: 0
     preserveHierarchy: 0
     skinWeightsMode: 0
     maxBonesPerVertex: 4
@@ -639,6 +640,9 @@ ModelImporter:
     secondaryUVAngleDistortion: 8
     secondaryUVAreaDistortion: 15.000001
     secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 1
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
     secondaryUVPackMargin: 4
     useFileScale: 1
   tangentSpace:
@@ -671,7 +675,8 @@ ModelImporter:
   autoGenerateAvatarMappingIfUnspecified: 1
   animationType: 2
   humanoidOversampling: 1
-  avatarSetup: 0
+  avatarSetup: 1
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 0
   additionalBone: 0
   userData: 
   assetBundleName: 
@@ -681,5 +686,5 @@ AssetOrigin:
   productId: 178235
   packageName: Free Animals - Quirky Series
   packageVersion: 1.4
-  assetPath: Assets/Animation/Sparrow_Animations.fbx
+  assetPath: Assets/Quirky Series Ultimate/FREE/Animations/Taipan_Animations.fbx
   uploadId: 580081

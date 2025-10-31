@@ -71,7 +71,7 @@ Material:
     m_Ints: []
     m_Floats:
     - Vector1_17E53C12: 0.62
-    - Vector1_244B0600: 1.2
+    - Vector1_244B0600: 1.23
     - Vector1_34CF798A: 1.75
     - Vector1_36E8227: 0.65
     - Vector1_3D886DA1: 0.05
@@ -105,14 +105,14 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _Surface: 0
-    - _WaveFrequency: 1.75
+    - _WaveFrequency: 11.33
     - _WaveScale: 0.05
     - _WaveSpeed: 1.5
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
-    - Color_7D9A58EC: {r: 0.09019602, g: 0.2898334, b: 0.5372549, a: 0.6392157}
-    - Color_F01C36BF: {r: 0.09803913, g: 0.5387899, b: 0.65882355, a: 0.07058824}
+    - Color_7D9A58EC: {r: 0.09019599, g: 0.28983337, b: 0.5372549, a: 0.33333334}
+    - Color_F01C36BF: {r: 0.4764151, g: 1, b: 0.9893079, a: 0.07058824}
     - Vector2_37B21477: {r: 0.3, g: 0.3, b: 1, a: 1}
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}

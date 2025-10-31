@@ -77,7 +77,10 @@ namespace StarterAssets
 
         [Header("Swimming")]
         [SerializeField] private LayerMask waterMask;
-        [SerializeField] private float swimSpeed = 0.02f;
+        [Tooltip("Swim speed of the character in m/s")]
+        public float swimSpeed = 0.5f;
+        [Tooltip("Gravity in water (should be less negative than normal gravity)")]
+        public float swimGravity = -5.0f;  // -15보다 약함
         private bool _isSwimming = false;
 
 
@@ -237,8 +240,6 @@ namespace StarterAssets
             else
             {
                 targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
-                Debug.Log("targetSpeed : " + targetSpeed );
-                Debug.Log("swimSpeed : " + swimSpeed);
             }
 
             // a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
@@ -308,6 +309,27 @@ namespace StarterAssets
 
         private void JumpAndGravity()
         {
+            if (_isSwimming)
+            {
+                // 수영 중 약한 중력 (또는 0)
+                float swimGravity = -8.0f;  
+
+                // 수영 중 위로 올라가기
+                if (_input.jump)
+                {
+                    _verticalVelocity = 2f; // 작은 상승력
+                }
+                else
+                {
+                    _verticalVelocity = 0f; // 수평 유지
+                }
+                
+                if (_verticalVelocity < _terminalVelocity)
+                {
+                    _verticalVelocity += swimGravity * Time.deltaTime;
+                }
+                return; // 일반 중력 로직 건너뛰기
+            }
             if (Grounded)
             {
                 // reset the fall timeout timer
