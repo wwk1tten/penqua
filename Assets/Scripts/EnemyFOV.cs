@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEditor;
 
 public class EnemyFOV : MonoBehaviour
 {
@@ -30,8 +31,22 @@ public class EnemyFOV : MonoBehaviour
         
         if (playerTransform == null)
         {
-            Debug.LogWarning("Player를 찾을 수 없습니다!");
+            Debug.LogWarning("❌ Player를 찾을 수 없습니다!");
         }
+        else
+        {
+            Debug.Log("✓ Player 발견: " + playerTransform.gameObject.name);
+        }
+        
+        if (obstacleLayer.value == 0)
+        {
+            Debug.LogError("❌ Obstacle Layer가 설정되지 않았습니다! Inspector에서 설정하세요!");
+        }
+        else
+        {
+            Debug.Log("✓ Obstacle Layer 설정 완료");
+        }
+        
     }
 
     void Update()
@@ -48,16 +63,18 @@ public class EnemyFOV : MonoBehaviour
     {
         canSeePlayer = false;
         
+        if (playerTransform == null) return;
+        
         Vector3 directionToPlayer = playerTransform.position - transform.position;
         float distanceToPlayer = directionToPlayer.magnitude;
         
-        // 1단계: 범위 확인
+        // 1. 범위 확인
         if (distanceToPlayer > detectionRange)
         {
             return;
         }
         
-        // 2단계: 시야각 확인 (FOV)
+        // 2. 시야각 확인 (FOV)
         float angleToPlayer = Vector3.Angle(transform.forward, directionToPlayer.normalized);
         
         if (angleToPlayer > fieldOfView / 2f)
@@ -65,34 +82,48 @@ public class EnemyFOV : MonoBehaviour
             return;
         }
         
-        // 3단계: 장애물 확인 (Raycast)
+        // 3. 장애물 확인
         if (IsPlayerBlocked(directionToPlayer, distanceToPlayer))
         {
-            return;
+            return; // 장애물에 가려져서 못 봄
         }
         
         // 모든 조건 통과: 플레이어 감지!
         canSeePlayer = true;
-        Debug.Log($"[{gameObject.name}] 플레이어 감지됨! 거리: {distanceToPlayer:F2}m, 각도: {angleToPlayer:F2}°");
+        Debug.Log($"[{gameObject.name}] 플레이어 발견!");
     }
+
+
 
     /// <summary>
     /// 플레이어가 장애물에 의해 차단되었는지 확인
     /// </summary>
     private bool IsPlayerBlocked(Vector3 directionToPlayer, float distanceToPlayer)
     {
+        // 경비원 눈 높이에서 Raycast (더 정확)
+        Vector3 eyePosition = transform.position + Vector3.up * 1.2f;
+        Vector3 playerHeadPosition = playerTransform.position + Vector3.up * 1.2f;
+        
+        Vector3 directionToPlayerHead = (playerHeadPosition - eyePosition).normalized;
+        float actualDistance = Vector3.Distance(eyePosition, playerHeadPosition);
+        
+        // Debug용 광선 그리기
+        Debug.DrawRay(eyePosition, directionToPlayerHead * actualDistance, Color.yellow, 0.1f);
+        
         // Raycast로 장애물 확인
-        if (Physics.Raycast(transform.position, directionToPlayer.normalized, 
-            out RaycastHit hit, distanceToPlayer, obstacleLayer))
+        if (Physics.Raycast(eyePosition, directionToPlayerHead, out RaycastHit hit, actualDistance, obstacleLayer))
         {
-            // 플레이어보다 가까운 장애물이 있으면 차단됨
-            if (hit.distance < distanceToPlayer - 0.1f)
+            // 플레이어가 아닌 다른 물체에 먼저 맞았으면 차단됨
+            if (hit.collider.transform != playerTransform)
             {
-                Debug.Log($"플레이어가 {hit.collider.gameObject.name}에 의해 차단됨");
-                return true;
+                Debug.DrawLine(eyePosition, hit.point, Color.red, 0.1f);
+                Debug.Log($"{hit.collider.gameObject.name}이(가) 플레이어를 가림");
+                return true; // 차단됨!
             }
         }
         
+        // 차단 안 됨
+        Debug.DrawLine(eyePosition, playerHeadPosition, Color.green, 0.1f);
         return false;
     }
 
@@ -114,6 +145,39 @@ public class EnemyFOV : MonoBehaviour
         // 감지 범위 원 (노란색)
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectionRange);
+
+        // 2. 시야 삼각형
+        float halfFOV = fieldOfView / 2f;
+        
+        Vector3 origin = transform.position;
+        Vector3 leftEdge = origin + Quaternion.Euler(0, -halfFOV, 0) * transform.forward * detectionRange;
+        Vector3 rightEdge = origin + Quaternion.Euler(0, halfFOV, 0) * transform.forward * detectionRange;
+        
+        // 플레이어 발견 시 빨강, 아니면 초록
+        Gizmos.color = canSeePlayer ? Color.red : Color.green;
+        Gizmos.DrawLine(origin, leftEdge);
+        Gizmos.DrawLine(origin, rightEdge);
+        Gizmos.DrawLine(leftEdge, rightEdge);
+        
+        // 중앙선 (전방 방향)
+        Gizmos.DrawLine(origin, origin + transform.forward * detectionRange);
+        
+
+        // 플레이어로의 선
+        if (playerTransform != null)
+        {
+            Vector3 eyePosition = transform.position + Vector3.up * 1.5f;
+            Vector3 playerHeadPosition = playerTransform.position + Vector3.up * 1.5f;
+            
+            // 장애물에 가려졌는지에 따라 색상
+            Gizmos.color = canSeePlayer ? Color.red : Color.gray;
+            Gizmos.DrawLine(eyePosition, playerHeadPosition);
+            
+            if (canSeePlayer)
+            {
+                Gizmos.DrawWireSphere(playerHeadPosition, 0.5f);
+            }
+        }
     }
 
     /// <summary>
@@ -179,6 +243,6 @@ public class EnemyFOV : MonoBehaviour
             Gizmos.DrawLine(transform.position + currentDir, transform.position + nextDir);
         }
     }
-
+    
     #endregion
 }

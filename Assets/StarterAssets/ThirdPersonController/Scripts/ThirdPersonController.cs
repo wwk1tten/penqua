@@ -82,6 +82,8 @@ namespace StarterAssets
         [Tooltip("Gravity in water (should be less negative than normal gravity)")]
         public float swimGravity = -5.0f;  // -15보다 약함
         private bool _isSwimming = false;
+        [Header("Camera")]
+        public bool useTopDownCamera = true; 
 
 
         // cinemachine
