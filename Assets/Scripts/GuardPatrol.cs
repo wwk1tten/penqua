@@ -7,7 +7,11 @@ public class GuardPatrol : MonoBehaviour
     public enum GuardState
     {
         Patrol,
-        Alert
+        Suspicious,
+        Alert,
+        Chase,
+        Return
+
     }
 
     [Header("State")]
@@ -28,18 +32,43 @@ public class GuardPatrol : MonoBehaviour
     
     private NavMeshAgent agent;
     private AISensor sensor;
+    private Animator animator;
+
     private int currentWaypointIndex = 0;
     private float waitTimer = 0f;
     private bool isWaiting = false;
     private float alertTimer = 0f;
     private Transform playerTarget = null;
 
+    [Header("Detection")]
+    public float visionRange = 15f;
+    public float visionAngle = 90f;
+    public float hearingRange = 10f;
+    
+    [Header("Chase")]
+    public float chaseSpeed = 5f;
+    [Header("Wetness")]
+    public float maxWetness = 100f;
+    private float currentWetness = 0f;
+    public float wetnessDecayRate = 5f; // 초당 회복 속도
+    // 기본 속도 저장
+    private float basePatrolSpeed;
+    private float baseAlertSpeed;
+
+    private Vector3 lastKnownPosition;
+    private Vector3 originalPosition;
+
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         sensor = GetComponent<AISensor>();
-        agent.speed = patrolSpeed;
+        animator = GetComponent<Animator>();
+
+        // 기본 속도 저장
+        basePatrolSpeed = patrolSpeed;
+        baseAlertSpeed = alertSpeed;
         
+        agent.speed = patrolSpeed;
         if (alertUI != null)
         {
             alertUI.SetActive(false);
@@ -51,12 +80,20 @@ public class GuardPatrol : MonoBehaviour
             enabled = false;
             return;
         }
-        
         SetDestination();
     }
 
     void Update()
     {
+        // 젖음 회복 (시간이 지나면서 감소)
+        if (currentWetness > 0)
+        {
+            currentWetness -= wetnessDecayRate * Time.deltaTime;
+            currentWetness = Mathf.Max(0, currentWetness);
+        }
+        
+        // 젖음에 따라 속도 조정
+        UpdateSpeedByWetness();
         // 플레이어 감지 확인
         DetectPlayer();
         
@@ -67,10 +104,24 @@ public class GuardPatrol : MonoBehaviour
                 UpdatePatrol();
                 break;
             
+            case GuardState.Suspicious:
+                UpdateSuspicious();
+                break;
+            
             case GuardState.Alert:
                 UpdateAlert();
                 break;
+                
+            case GuardState.Chase:
+                UpdateChase();
+                break;
+                
+            case GuardState.Return:
+                UpdateReturn();
+                break;
         }
+
+        UpdateAnimator();
     }
 
     /// <summary>
@@ -121,7 +172,6 @@ public class GuardPatrol : MonoBehaviour
                 isWaiting = false;
                 currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Length;
                 SetDestination();
-                Debug.Log($"다음 Waypoint로 이동: {currentWaypointIndex}");
             }
             return;
         }
@@ -131,7 +181,6 @@ public class GuardPatrol : MonoBehaviour
         {
             isWaiting = true;
             waitTimer = waitTime;
-            Debug.Log($"Waypoint {currentWaypointIndex} 도착, {waitTime}초 대기");
         }
     }
 
@@ -155,12 +204,85 @@ public class GuardPatrol : MonoBehaviour
         // Alert 타이머
         alertTimer -= Time.deltaTime;
         
-        if (alertTimer <= 0)
+        if (alertTimer <= 0.5)
         {
-            Debug.Log("Alert 타임아웃, Patrol로 복귀");
+            ChangeState(GuardState.Chase);
+        }
+    }
+
+    /// <summary>
+    /// 의심 상태 업데이트 (소리 발생 지점으로 이동)
+    /// </summary>
+    void UpdateSuspicious()
+    {
+        // UI 활성화
+        if (alertUI != null)
+        {
+            alertUI.SetActive(true);
+        }
+        
+        // 목적지 도착 확인
+        if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
+        {
+            Debug.Log("소리 발생 지점 도착, 플레이어를 찾지 못함");
+            ChangeState(GuardState.Return);
+        }
+    }
+
+    /// <summary>
+    /// 추격 상태 업데이트
+    /// </summary>
+    void UpdateChase()
+    {
+        // UI 활성화
+        if (alertUI != null)
+        {
+            alertUI.SetActive(true);
+        }
+        
+        // 플레이어를 향해 이동
+        if (playerTarget != null)
+        {
+            agent.destination = playerTarget.position;
+            lastKnownPosition = playerTarget.position;
+        }
+        
+        // 플레이어를 놓쳤는지 확인
+        if (sensor != null && sensor.Objects.Count == 0)
+        {
+            ChangeState(GuardState.Return);
+        }
+    }
+
+    /// <summary>
+    /// 복귀 상태 업데이트
+    /// </summary>
+    void UpdateReturn()
+    {
+        // UI 비활성화
+        if (alertUI != null)
+        {
+            alertUI.SetActive(false);
+        }
+        
+        // 원래 순찰 경로로 복귀
+        if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
+        {
             ChangeState(GuardState.Patrol);
         }
     }
+
+
+    /// <summary>
+    /// 애니메이터 파라미터 업데이트
+    /// </summary>
+    void UpdateAnimator()
+    {
+        if (animator == null) return;
+        // Patrol이면 false, Alert이면 true
+        animator.SetBool("isAlert", currentState == GuardState.Alert);
+    }
+
 
     /// <summary>
     /// 상태 변경
@@ -169,23 +291,88 @@ public class GuardPatrol : MonoBehaviour
     {
         if (currentState == newState) return;
 
-        Debug.Log($"[{gameObject.name}] 상태 변경: {currentState} → {newState}");
         currentState = newState;
 
         switch (newState)
         {
             case GuardState.Patrol:
-                agent.speed = patrolSpeed;
+                agent.speed = basePatrolSpeed * (1f - (currentWetness / maxWetness));
                 isWaiting = false;
                 SetDestination();
+                
+                if (animator != null)
+                {
+                    animator.SetBool("isAlert", false);
+                }
+                break;
+
+            case GuardState.Suspicious:
+                agent.speed = basePatrolSpeed * (1f - (currentWetness / maxWetness));
+                isWaiting = false;
+                
+                if (animator != null)
+                {
+                    animator.SetBool("isAlert", true);
+                }
                 break;
 
             case GuardState.Alert:
-                agent.speed = alertSpeed;
+                agent.speed = baseAlertSpeed * (1f - (currentWetness / maxWetness));
                 alertTimer = alertTimeout;
                 isWaiting = false;
+
+                if (animator != null)
+                {
+                    animator.SetBool("isAlert", true);
+                }
+                break;
+                
+            case GuardState.Chase:
+                agent.speed = chaseSpeed * (1f - (currentWetness / maxWetness));
+                isWaiting = false;
+                
+                if (animator != null)
+                {
+                    animator.SetBool("isAlert", true);
+                }
+                break;
+                
+            case GuardState.Return:
+                agent.speed = basePatrolSpeed * (1f - (currentWetness / maxWetness));
+                isWaiting = false;
+                
+                int closestWaypointIndex = FindClosestWaypoint();
+                currentWaypointIndex = closestWaypointIndex;
+                agent.SetDestination(waypoints[currentWaypointIndex].position);
+                
+                if (animator != null)
+                {
+                    animator.SetBool("isAlert", false);
+                }
                 break;
         }
+    }
+
+
+    /// <summary>
+    /// 가장 가까운 waypoint 찾기
+    /// </summary>
+    int FindClosestWaypoint()
+    {
+        int closestIndex = 0;
+        float closestDistance = float.MaxValue;
+        
+        for (int i = 0; i < waypoints.Length; i++)
+        {
+            float distance = Vector3.Distance(transform.position, waypoints[i].position);
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestIndex = i;
+            }
+        }
+        
+        return closestIndex;
     }
 
     void SetDestination()
@@ -196,6 +383,71 @@ public class GuardPatrol : MonoBehaviour
         }
     }
 
+
+    public void OnSoundHeard(Vector3 soundPosition)
+    {
+        float distance = Vector3.Distance(transform.position, soundPosition);
+        
+        // Patrol 상태일 때만 소리에 반응
+        if (distance <= hearingRange && currentState == GuardState.Patrol)
+        {
+            Debug.Log($"[{gameObject.name}] 소리 감지! 위치: {soundPosition}");
+            lastKnownPosition = soundPosition;
+            agent.SetDestination(soundPosition);
+            ChangeState(GuardState.Suspicious);
+        }
+    }
+
+
+    /// <summary>
+    /// 젖음 수치에 따라 속도 감소
+    /// </summary>
+    void UpdateSpeedByWetness()
+    {
+        // 젖음에 따른 속도 감소 비율 계산 (0 ~ 1)
+        float speedMultiplier = 1f - (currentWetness / maxWetness);
+        speedMultiplier = Mathf.Clamp01(speedMultiplier); // 0~1 사이로 제한
+        
+        // 현재 상태에 맞는 속도 적용
+        if (currentState == GuardState.Alert || currentState == GuardState.Chase)
+        {
+            agent.speed = baseAlertSpeed * speedMultiplier;
+        }
+        else if (currentState == GuardState.Patrol || currentState == GuardState.Suspicious)
+        {
+            agent.speed = basePatrolSpeed * speedMultiplier;
+        }
+        
+        // Debug.Log($"[{gameObject.name}] 젖음: {currentWetness:F1} / {maxWetness}, 속도배수: {speedMultiplier:F2}");
+    }
+
+    /// <summary>
+    /// 물총에 맞음 (외부에서 호출됨)
+    /// </summary>
+    public void TakeWaterDamage(float damage, Vector3 hitPoint)
+    {
+        currentWetness = Mathf.Min(currentWetness + damage, maxWetness);
+        
+        Debug.Log($"[{gameObject.name}] 물총 맞음! 젖음 증가: {currentWetness:F1}");
+        
+        // 선택: 맞은 지점에서 파티클 효과
+        // Instantiate(waterHitEffect, hitPoint, Quaternion.identity);
+        
+        // 필요시 경비원을 잠시 혼란 상태로 만들기
+        if (currentWetness >= maxWetness)
+        {
+            Debug.Log($"[{gameObject.name}] 완전히 젖었습니다!");
+            // 상태를 Suspicious로 전환하거나 시간 증가 등의 패널티 추가 가능
+        }
+    }
+
+    /// <summary>
+    /// 젖음 정보 조회
+    /// </summary>
+    public float GetWetnessPercent()
+    {
+        return (currentWetness / maxWetness) * 100f;
+    }
     void OnDrawGizmos()
     {
         if (waypoints == null || waypoints.Length < 2) return;

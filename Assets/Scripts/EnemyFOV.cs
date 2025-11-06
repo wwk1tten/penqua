@@ -28,25 +28,6 @@ public class EnemyFOV : MonoBehaviour
     {
         // 플레이어 찾기
         playerTransform = GameObject.FindGameObjectWithTag("Player")?.transform;
-        
-        if (playerTransform == null)
-        {
-            Debug.LogWarning("❌ Player를 찾을 수 없습니다!");
-        }
-        else
-        {
-            Debug.Log("✓ Player 발견: " + playerTransform.gameObject.name);
-        }
-        
-        if (obstacleLayer.value == 0)
-        {
-            Debug.LogError("❌ Obstacle Layer가 설정되지 않았습니다! Inspector에서 설정하세요!");
-        }
-        else
-        {
-            Debug.Log("✓ Obstacle Layer 설정 완료");
-        }
-        
     }
 
     void Update()
@@ -90,7 +71,6 @@ public class EnemyFOV : MonoBehaviour
         
         // 모든 조건 통과: 플레이어 감지!
         canSeePlayer = true;
-        Debug.Log($"[{gameObject.name}] 플레이어 발견!");
     }
 
 
@@ -117,7 +97,6 @@ public class EnemyFOV : MonoBehaviour
             if (hit.collider.transform != playerTransform)
             {
                 Debug.DrawLine(eyePosition, hit.point, Color.red, 0.1f);
-                Debug.Log($"{hit.collider.gameObject.name}이(가) 플레이어를 가림");
                 return true; // 차단됨!
             }
         }
