@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -49,17 +50,26 @@ public class GuardPatrol : MonoBehaviour
     public float chaseSpeed = 5f;
     [Header("Wetness")]
     public float maxWetness = 100f;
+    public float stunWetness = 80f;
     private float currentWetness = 0f;
     public float wetnessDecayRate = 5f; // 초당 회복 속도
+    [Header("Stun")]
+    public float puddleSpeedMultiplier = 0.5f; // 50% 속도로 감소
+    public float fallStunDuration = 1.5f; // 넘어졌을 때 스턴 시간
+    private bool isInPuddle = false;
+    private bool isFalling = false; // 넘어지는 중
+
     // 기본 속도 저장
     private float basePatrolSpeed;
     private float baseAlertSpeed;
+    private float baseChaseSpeed;
 
     private Vector3 lastKnownPosition;
     private Vector3 originalPosition;
+    // 애니메이터 파라미터
+    private int _animIDFall;
 
-    void Start()
-    {
+    void Start(){
         agent = GetComponent<NavMeshAgent>();
         sensor = GetComponent<AISensor>();
         animator = GetComponent<Animator>();
@@ -67,8 +77,13 @@ public class GuardPatrol : MonoBehaviour
         // 기본 속도 저장
         basePatrolSpeed = patrolSpeed;
         baseAlertSpeed = alertSpeed;
+        basePatrolSpeed = chaseSpeed;
+
+        // 애니메이터 파라미터 캐싱
+        _animIDFall = Animator.StringToHash("Fall");
         
         agent.speed = patrolSpeed;
+
         if (alertUI != null)
         {
             alertUI.SetActive(false);
@@ -83,8 +98,10 @@ public class GuardPatrol : MonoBehaviour
         SetDestination();
     }
 
-    void Update()
-    {
+    void Update(){
+        // 넘어지는 중이면 아무것도 안 함
+        if (isFalling) return;
+
         // 젖음 회복 (시간이 지나면서 감소)
         if (currentWetness > 0)
         {
@@ -155,8 +172,7 @@ public class GuardPatrol : MonoBehaviour
     /// <summary>
     /// 순찰 상태 업데이트
     /// </summary>
-    void UpdatePatrol()
-    {
+    void UpdatePatrol(){
         // UI 비활성화
         if (alertUI != null)
         {
@@ -187,8 +203,7 @@ public class GuardPatrol : MonoBehaviour
     /// <summary>
     /// 경보 상태 업데이트
     /// </summary>
-    void UpdateAlert()
-    {
+    void UpdateAlert(){
         // UI 활성화
         if (alertUI != null)
         {
@@ -213,8 +228,7 @@ public class GuardPatrol : MonoBehaviour
     /// <summary>
     /// 의심 상태 업데이트 (소리 발생 지점으로 이동)
     /// </summary>
-    void UpdateSuspicious()
-    {
+    void UpdateSuspicious(){
         // UI 활성화
         if (alertUI != null)
         {
@@ -232,8 +246,7 @@ public class GuardPatrol : MonoBehaviour
     /// <summary>
     /// 추격 상태 업데이트
     /// </summary>
-    void UpdateChase()
-    {
+    void UpdateChase(){
         // UI 활성화
         if (alertUI != null)
         {
@@ -406,26 +419,32 @@ public class GuardPatrol : MonoBehaviour
     {
         // 젖음에 따른 속도 감소 비율 계산 (0 ~ 1)
         float speedMultiplier = 1f - (currentWetness / maxWetness);
-        speedMultiplier = Mathf.Clamp01(speedMultiplier); // 0~1 사이로 제한
+        speedMultiplier = Mathf.Clamp01(speedMultiplier);
         
         // 현재 상태에 맞는 속도 적용
-        if (currentState == GuardState.Alert || currentState == GuardState.Chase)
+        switch (currentState)
         {
-            agent.speed = baseAlertSpeed * speedMultiplier;
+            case GuardState.Patrol:
+            case GuardState.Suspicious:
+            case GuardState.Return:
+                agent.speed = basePatrolSpeed * speedMultiplier;
+                break;
+            
+            case GuardState.Alert:
+                agent.speed = baseAlertSpeed * speedMultiplier;
+                break;
+            
+            case GuardState.Chase:
+                agent.speed = baseChaseSpeed * speedMultiplier;
+                break;
         }
-        else if (currentState == GuardState.Patrol || currentState == GuardState.Suspicious)
-        {
-            agent.speed = basePatrolSpeed * speedMultiplier;
-        }
-        
-        // Debug.Log($"[{gameObject.name}] 젖음: {currentWetness:F1} / {maxWetness}, 속도배수: {speedMultiplier:F2}");
     }
+
 
     /// <summary>
     /// 물총에 맞음 (외부에서 호출됨)
     /// </summary>
-    public void TakeWaterDamage(float damage, Vector3 hitPoint)
-    {
+    public void TakeWaterDamage(float damage, Vector3 hitPoint){
         currentWetness = Mathf.Min(currentWetness + damage, maxWetness);
         
         Debug.Log($"[{gameObject.name}] 물총 맞음! 젖음 증가: {currentWetness:F1}");
@@ -448,8 +467,65 @@ public class GuardPatrol : MonoBehaviour
     {
         return (currentWetness / maxWetness) * 100f;
     }
-    void OnDrawGizmos()
+
+    private void OnTriggerEnter(Collider other)
     {
+        if (other.CompareTag("WaterPuddle") && !isInPuddle)
+        {
+            isInPuddle = true;
+            currentWetness = stunWetness;
+            
+            // 넘어지는 애니메이션 + 스턴
+            if (!isFalling)
+            {
+                StartCoroutine(FallInPuddleCoroutine());
+            }
+            
+            Debug.Log($"{gameObject.name} 웅덩이 진입!");
+        }
+    }
+    private void OnTriggerStay(Collider other)
+    {
+        // 웅덩이 안에 계속 있으면 젖음 100 유지
+        if (other.CompareTag("WaterPuddle"))
+        {
+            currentWetness = stunWetness;
+        }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("WaterPuddle"))
+        {
+            isInPuddle = false;
+            Debug.Log($"{gameObject.name} 웅덩이 탈출! 속도 복귀");
+        }
+    }
+    
+    /// <summary>
+    /// 넘어지는 코루틴
+    /// </summary>
+    private IEnumerator FallInPuddleCoroutine()
+    {
+        isFalling = true;
+        agent.isStopped = true; // NavMesh 정지
+        
+        // 넘어지는 애니메이션 트리거
+        if (animator != null)
+        {
+            Debug.Log("animation");
+            animator.SetTrigger(_animIDFall);
+        }
+
+ 
+        // 넘어져 있는 시간
+        yield return new WaitForSeconds(fallStunDuration);
+
+        isFalling = false;
+        agent.isStopped = false;
+
+    }
+    void OnDrawGizmos(){
         if (waypoints == null || waypoints.Length < 2) return;
         
         // 상태에 따른 색상

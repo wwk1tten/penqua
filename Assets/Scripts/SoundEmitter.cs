@@ -5,22 +5,12 @@ public class SoundEmitter : MonoBehaviour
     public static void MakeSound(Vector3 position, float range)
     {
         Collider[] colliders = Physics.OverlapSphere(position, range);
-        
-        Debug.Log($"OverlapSphere 감지된 콜라이더 수: {colliders.Length}");
-        
         foreach (var col in colliders)
         {
-            Debug.Log($"감지된 오브젝트: {col.gameObject.name}");
-            
             GuardHearing hearing = col.GetComponent<GuardHearing>();
             if (hearing != null)
             {
-                Debug.Log($"GuardHearing 발견! {col.gameObject.name}에게 소리 전달");
                 hearing.OnSoundHeard(position);
-            }
-            else
-            {
-                Debug.Log($"{col.gameObject.name}에 GuardHearing 컴포넌트 없음");
             }
         }
     }

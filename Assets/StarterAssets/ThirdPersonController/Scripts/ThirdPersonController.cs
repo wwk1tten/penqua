@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 #if ENABLE_INPUT_SYSTEM 
 using UnityEngine.InputSystem;
 #endif
@@ -84,7 +85,11 @@ namespace StarterAssets
         private bool _isSwimming = false;
         [Header("Camera")]
         public bool useTopDownCamera = true; 
-
+        [Header("Stun")]
+        public float slideStunDuration = 1.5f;
+        private bool isStunned = false;
+        private Vector3 slideVelocity = Vector3.zero;
+        private float slideFriction = 0.95f;
 
         // cinemachine
         private float _cinemachineTargetYaw;
@@ -97,10 +102,17 @@ namespace StarterAssets
         private float _rotationVelocity;
         private float _verticalVelocity;
         private float _terminalVelocity = 53.0f;
+        private Vector3 _slideVelocity = Vector3.zero;
 
         // timeout deltatime
         private float _jumpTimeoutDelta;
         private float _fallTimeoutDelta;
+
+        // slippery
+        private float _slipFriction = 0.93f; // (0~1, 낮을수록 오래 미끄러짐)
+        private float _slipThreshold = 0.1f; // 이 이하로 느려지면 정지
+        private float _slipControlRate = 1.2f; // 방향전환 속도
+        private float _slipSpeed = 4f;
 
         // animation IDs
         private int _animIDSpeed;
@@ -109,6 +121,9 @@ namespace StarterAssets
         private int _animIDFreeFall;
         private int _animIDMotionSpeed;
         private int _animIDIsSwimming;
+        private int _animIDIsRolling;
+
+
 
 #if ENABLE_INPUT_SYSTEM 
         private PlayerInput _playerInput;
@@ -117,11 +132,13 @@ namespace StarterAssets
         private CharacterController _controller;
         private StarterAssetsInputs _input;
         private GameObject _mainCamera;
+        private Vector3 _slipVelocity = Vector3.zero;
+        
 
         private const float _threshold = 0.01f;
 
+        private bool _isOnPuddle = false;
         private bool _hasAnimator;
-
         private bool IsCurrentDeviceMouse
         {
             get
@@ -135,8 +152,7 @@ namespace StarterAssets
         }
 
 
-        private void Awake()
-        {
+        private void Awake(){
             // get a reference to our main camera
             if (_mainCamera == null)
             {
@@ -144,8 +160,7 @@ namespace StarterAssets
             }
         }
 
-        private void Start()
-        {
+        private void Start(){
             _cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
             
             _hasAnimator = TryGetComponent(out _animator);
@@ -162,19 +177,28 @@ namespace StarterAssets
             // reset our timeouts on start
             _jumpTimeoutDelta = JumpTimeout;
             _fallTimeoutDelta = FallTimeout;
+            _animIDIsRolling = Animator.StringToHash("isRolling");
         }
 
-        private void Update()
-        {
+        private void Update(){
             _hasAnimator = TryGetComponent(out _animator);
 
+            if (isStunned)
+            {
+                // 미끄러지는 동안 계속 이동
+                if (slideVelocity.magnitude > 0.1f)
+                {
+                    slideVelocity *= slideFriction;
+                    _controller.Move(slideVelocity * Time.deltaTime);
+                }
+                return; // 조작 불가
+            }
             JumpAndGravity();
             GroundedCheck();
             Move();
 
             // 수영 상태 Animator 업데이트
-            if (_hasAnimator)
-            {
+            if (_hasAnimator){
                 _animator.SetBool(_animIDIsSwimming, _isSwimming);
             }
         }
@@ -184,8 +208,7 @@ namespace StarterAssets
             CameraRotation();
         }
 
-        private void AssignAnimationIDs()
-        {
+        private void AssignAnimationIDs(){
             _animIDSpeed = Animator.StringToHash("Speed");
             _animIDGrounded = Animator.StringToHash("Grounded");
             _animIDJump = Animator.StringToHash("Jump");
@@ -194,8 +217,7 @@ namespace StarterAssets
             _animIDIsSwimming = Animator.StringToHash("isSwimming");
         }
 
-        private void GroundedCheck()
-        {
+        private void GroundedCheck(){
             // set sphere position, with offset
             Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - GroundedOffset,
                 transform.position.z);
@@ -209,8 +231,7 @@ namespace StarterAssets
             }
         }
 
-        private void CameraRotation()
-        {
+        private void CameraRotation(){
             // if there is an input and camera position is not fixed
             if (_input.look.sqrMagnitude >= _threshold && !LockCameraPosition)
             {
@@ -230,84 +251,88 @@ namespace StarterAssets
                 _cinemachineTargetYaw, 0.0f);
         }
 
-        private void Move()
-        {
-            // set target speed based on move speed, sprint speed and if sprint is pressed
+        private void Move(){
             float targetSpeed;
-
-            if (_isSwimming)
-            {
-                targetSpeed = swimSpeed; // 수영 속도
+            
+            if (_isSwimming){
+                targetSpeed = swimSpeed;
             }
-            else
-            {
+            else{
                 targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
             }
 
-            // a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
-
-            // note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-            // if there is no input, set the target speed to 0
             if (_input.move == Vector2.zero) targetSpeed = 0.0f;
-
-            // a reference to the players current horizontal velocity
             float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
-
             float speedOffset = 0.1f;
             float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
 
-            // accelerate or decelerate to target speed
+            if (_isOnPuddle)
+            {
+                Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y);
+                
+                if (_input.move != Vector2.zero)
+                {
+                    _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg +
+                                    _mainCamera.transform.eulerAngles.y;
+                    float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity, RotationSmoothTime);
+                    transform.rotation = Quaternion.Euler(0f, rotation, 0f);
+
+                    Vector3 worldDir = Quaternion.Euler(0f, _targetRotation, 0f) * Vector3.forward;
+                    Vector3 targetSlipVelocity = worldDir.normalized * _slipSpeed;
+                    
+                    _slipVelocity = Vector3.Lerp(_slipVelocity, targetSlipVelocity, Time.deltaTime * _slipControlRate);
+                }
+                else
+                {   
+                    _slipVelocity *= _slipFriction;
+                    if (_slipVelocity.magnitude < _slipThreshold)
+                    {
+                        _slipVelocity = Vector3.zero;
+                    }
+                }
+                Vector3 vertical = new Vector3(0f, _verticalVelocity, 0f) * Time.deltaTime;
+                Vector3 moveAmount = _slipVelocity * Time.deltaTime;
+                
+                _controller.Move(moveAmount + vertical);
+                
+                _animationBlend = Mathf.Lerp(_animationBlend, _slipVelocity.magnitude, Time.deltaTime * SpeedChangeRate);
+                if (_hasAnimator)
+                {
+                    _animator.SetFloat(_animIDSpeed, _animationBlend);
+                    _animator.SetFloat(_animIDMotionSpeed, _input.move.magnitude);
+                }
+                return;
+            }
+
+            // --- 아래는 평소 이동 (원본 코드 유지) ---
             if (currentHorizontalSpeed < targetSpeed - speedOffset ||
                 currentHorizontalSpeed > targetSpeed + speedOffset)
             {
-                // creates curved result rather than a linear one giving a more organic speed change
-                // note T in Lerp is clamped, so we don't need to clamp our speed
                 _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude,
                     Time.deltaTime * SpeedChangeRate);
-
-                // round speed to 3 decimal places
                 _speed = Mathf.Round(_speed * 1000f) / 1000f;
             }
-            else
-            {
-                _speed = targetSpeed;
-            }
+            else { _speed = targetSpeed; }
 
             _animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * SpeedChangeRate);
             if (_animationBlend < 0.01f) _animationBlend = 0f;
-
-            // normalise input direction
-            Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
-
-            // note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-            // if there is a move input rotate player when the player is moving
+            Vector3 inputDir = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
             if (_input.move != Vector2.zero)
             {
-                _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg +
-                                  _mainCamera.transform.eulerAngles.y;
-                float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity,
-                    RotationSmoothTime);
-
-                // rotate to face input direction relative to camera position
+                _targetRotation = Mathf.Atan2(inputDir.x, inputDir.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
+                float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity, RotationSmoothTime);
                 transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
             }
-
-
             Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
-
-            // move the player
-            _controller.Move(targetDirection.normalized * (_speed * Time.deltaTime) +
-                             new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
-
-            // update animator if using character
+            _controller.Move(targetDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
             if (_hasAnimator)
             {
                 _animator.SetFloat(_animIDSpeed, _animationBlend);
                 _animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
             }
-
-            
         }
+
+
 
         private void JumpAndGravity()
         {
@@ -450,7 +475,25 @@ namespace StarterAssets
                 _isSwimming = true;
                 _animator.SetBool("isSwimming", _isSwimming);
                 Debug.Log("isSwimming");
+            }
 
+            else if (other.CompareTag("WaterPuddle") && !isStunned)
+            {
+                _isOnPuddle = true;
+                // Roll 애니메이션 시작
+                if (_hasAnimator)
+                {
+                    _animator.SetBool(_animIDIsRolling, true);
+                }
+                
+                // 현재 속도로 미끄러지기 시작
+                Vector3 currentVel = _controller.velocity;
+                currentVel.y = 0;
+                if (currentVel.magnitude > 0.5f)
+                {
+                    _slideVelocity = currentVel;
+                }
+                Debug.Log("Slippery in");
             }
         }
 
@@ -459,6 +502,21 @@ namespace StarterAssets
             if ((waterMask & (1 << other.gameObject.layer)) != 0)
             {
                 _isSwimming = false;
+            }
+
+            else if (other.CompareTag("WaterPuddle"))
+            {
+                _isOnPuddle = false;
+                _slideVelocity = Vector3.zero;
+                
+                // Roll 애니메이션 종료
+                if (_hasAnimator)
+                {
+                    _animator.SetBool(_animIDIsRolling, false);
+                }
+                
+                Debug.Log("Slippery out");
+                
             }
         }
     }
