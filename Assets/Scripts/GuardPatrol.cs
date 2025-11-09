@@ -238,7 +238,6 @@ public class GuardPatrol : MonoBehaviour
         // 목적지 도착 확인
         if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
         {
-            Debug.Log("소리 발생 지점 도착, 플레이어를 찾지 못함");
             ChangeState(GuardState.Return);
         }
     }
@@ -404,7 +403,6 @@ public class GuardPatrol : MonoBehaviour
         // Patrol 상태일 때만 소리에 반응
         if (distance <= hearingRange && currentState == GuardState.Patrol)
         {
-            Debug.Log($"[{gameObject.name}] 소리 감지! 위치: {soundPosition}");
             lastKnownPosition = soundPosition;
             agent.SetDestination(soundPosition);
             ChangeState(GuardState.Suspicious);
@@ -480,8 +478,6 @@ public class GuardPatrol : MonoBehaviour
             {
                 StartCoroutine(FallInPuddleCoroutine());
             }
-            
-            Debug.Log($"{gameObject.name} 웅덩이 진입!");
         }
     }
     private void OnTriggerStay(Collider other)
@@ -498,7 +494,6 @@ public class GuardPatrol : MonoBehaviour
         if (other.CompareTag("WaterPuddle"))
         {
             isInPuddle = false;
-            Debug.Log($"{gameObject.name} 웅덩이 탈출! 속도 복귀");
         }
     }
     
@@ -513,7 +508,6 @@ public class GuardPatrol : MonoBehaviour
         // 넘어지는 애니메이션 트리거
         if (animator != null)
         {
-            Debug.Log("animation");
             animator.SetTrigger(_animIDFall);
         }
 
