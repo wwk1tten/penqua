@@ -63,6 +63,8 @@ namespace StarterAssets
         [Header("Cinemachine")]
         [Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
         public GameObject CinemachineCameraTarget;
+        [Tooltip("조준 상태를 제어할 시네머신 가상 카메라")]
+        public Cinemachine.CinemachineVirtualCamera AimVirtualCamera;
 
         [Tooltip("How far in degrees can you move the camera up")]
         public float TopClamp = 70.0f;
@@ -90,10 +92,24 @@ namespace StarterAssets
         private bool isStunned = false;
         private Vector3 slideVelocity = Vector3.zero;
         private float slideFriction = 0.95f;
+        [Header("Aim")]
+        [Tooltip("조준 시 캐릭터 회전의 부드러움. 낮을수록 빠름")]
+        public float AimRotationSmoothTime = 0.05f;
+
+        [Tooltip("조준 시 카메라 줌 거리")]
+        public float AimCameraDistance = 2.0f; // 시네머신 가상 카메라에서 사용
+        public float AimFOV = 40f;
+        private bool _isAiming = false;
 
         // cinemachine
         private float _cinemachineTargetYaw;
         private float _cinemachineTargetPitch;
+
+        // 내부 저장용 변수
+        private float _originalFOV;
+        private float _originalAimDampingX;
+        private float _originalAimDampingY;
+        private Cinemachine.Cinemachine3rdPersonFollow _cinemachine3rdPersonFollow;
 
         // player
         private float _speed;
@@ -131,7 +147,7 @@ namespace StarterAssets
         private Animator _animator;
         private CharacterController _controller;
         private StarterAssetsInputs _input;
-        private GameObject _mainCamera;
+        private Camera _mainCamera;
         private Vector3 _slipVelocity = Vector3.zero;
         
 
@@ -151,14 +167,15 @@ namespace StarterAssets
             }
         }
 
-
-        private void Awake(){
+/*
+        private void Awake() // 또는 Start()
+        {
             // get a reference to our main camera
             if (_mainCamera == null)
             {
-                _mainCamera = GameObject.FindGameObjectWithTag("MainCamera");
+                _mainCamera = Camera.main;
             }
-        }
+        }*/
 
         private void Start(){
             _cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
@@ -166,13 +183,24 @@ namespace StarterAssets
             _hasAnimator = TryGetComponent(out _animator);
             _controller = GetComponent<CharacterController>();
             _input = GetComponent<StarterAssetsInputs>();
+            _mainCamera = Camera.main;
 #if ENABLE_INPUT_SYSTEM 
             _playerInput = GetComponent<PlayerInput>();
 #else
 			Debug.LogError( "Starter Assets package is missing dependencies. Please use Tools/Starter Assets/Reinstall Dependencies to fix it");
 #endif
+            // ✨ 시네머신 컴포넌트 찾아오기
+            if (AimVirtualCamera != null)
+            {
+                _cinemachine3rdPersonFollow = AimVirtualCamera.GetCinemachineComponent<Cinemachine.Cinemachine3rdPersonFollow>();
+                
+                // ✨ 원래 값 저장
+                _originalFOV = AimVirtualCamera.m_Lens.FieldOfView;
+                _originalAimDampingX = _cinemachine3rdPersonFollow.Damping.x;
+                _originalAimDampingY = _cinemachine3rdPersonFollow.Damping.y;
+            }
 
-            AssignAnimationIDs();
+            //AssignAnimationIDs();
 
             // reset our timeouts on start
             _jumpTimeoutDelta = JumpTimeout;
@@ -182,6 +210,8 @@ namespace StarterAssets
 
         private void Update(){
             _hasAnimator = TryGetComponent(out _animator);
+
+            _isAiming = _input.aim; // 현재 조준 상태인지 업데이트
 
             if (isStunned)
             {
@@ -205,17 +235,57 @@ namespace StarterAssets
 
         private void LateUpdate()
         {
-            CameraRotation();
+            // 현재 조준 상태 확인
+            _isAiming = _input.aim;
+
+            // 조준 중일 때와 아닐 때의 로직을 완벽히 분리
+            if (_isAiming)
+            {
+                // --- 조준 중일 때의 로직 ---
+                
+                // 1. 카메라 확대 및 고정
+                if (AimVirtualCamera != null && _cinemachine3rdPersonFollow != null)
+                {
+                    AimVirtualCamera.m_Lens.FieldOfView = Mathf.Lerp(AimVirtualCamera.m_Lens.FieldOfView, AimFOV, Time.deltaTime * 20f);
+                    _cinemachine3rdPersonFollow.Damping.x = 0f;
+                    _cinemachine3rdPersonFollow.Damping.y = 0f;
+                }
+
+                // 2. 마우스 입력으로 카메라와 캐릭터 동시 회전
+                if (_input.look.sqrMagnitude >= _threshold)
+                {
+                    float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
+                    _cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier;
+                    _cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier;
+                }
+
+                // 3. 각도 제한
+                _cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
+                _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, BottomClamp, TopClamp);
+                
+                // 4. 캐릭터 회전
+                transform.rotation = Quaternion.Euler(0.0f, _cinemachineTargetYaw, 0.0f);
+                
+                // 5. 시네머신 타겟 회전 (이것이 최종 카메라 각도를 결정)
+                CinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch + CameraAngleOverride, _cinemachineTargetYaw, 0.0f);
+            }
+            else
+            {
+                // --- 조준 중이 아닐 때의 로직 ---
+                
+                // 1. 카메라 원래대로 복구
+                if (AimVirtualCamera != null && _cinemachine3rdPersonFollow != null)
+                {
+                    AimVirtualCamera.m_Lens.FieldOfView = Mathf.Lerp(AimVirtualCamera.m_Lens.FieldOfView, _originalFOV, Time.deltaTime * 20f);
+                    _cinemachine3rdPersonFollow.Damping.x = _originalAimDampingX;
+                    _cinemachine3rdPersonFollow.Damping.y = _originalAimDampingY;
+                }
+
+                // 2. 기존 카메라 회전 함수 호출
+                CameraRotation();
+            }
         }
 
-        private void AssignAnimationIDs(){
-            _animIDSpeed = Animator.StringToHash("Speed");
-            _animIDGrounded = Animator.StringToHash("Grounded");
-            _animIDJump = Animator.StringToHash("Jump");
-            _animIDFreeFall = Animator.StringToHash("FreeFall");
-            _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
-            _animIDIsSwimming = Animator.StringToHash("isSwimming");
-        }
 
         private void GroundedCheck(){
             // set sphere position, with offset
@@ -238,99 +308,82 @@ namespace StarterAssets
                 //Don't multiply mouse input by Time.deltaTime;
                 float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
 
+
                 _cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier;
                 _cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier;
             }
 
+
             // clamp our rotations so our values are limited 360 degrees
             _cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
             _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, BottomClamp, TopClamp);
+
 
             // Cinemachine will follow this target
             CinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch + CameraAngleOverride,
                 _cinemachineTargetYaw, 0.0f);
         }
 
-        private void Move(){
-            float targetSpeed;
-            
-            if (_isSwimming){
-                targetSpeed = swimSpeed;
-            }
-            else{
-                targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
-            }
-
+        private void Move()
+        {
+            // 목표 속도 계산 (기존과 동일)
+            float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
             if (_input.move == Vector2.zero) targetSpeed = 0.0f;
+
             float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
             float speedOffset = 0.1f;
             float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
 
-            if (_isOnPuddle)
+            if (currentHorizontalSpeed < targetSpeed - speedOffset || currentHorizontalSpeed > targetSpeed + speedOffset)
             {
-                Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y);
-                
-                if (_input.move != Vector2.zero)
-                {
-                    _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg +
-                                    _mainCamera.transform.eulerAngles.y;
-                    float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity, RotationSmoothTime);
-                    transform.rotation = Quaternion.Euler(0f, rotation, 0f);
-
-                    Vector3 worldDir = Quaternion.Euler(0f, _targetRotation, 0f) * Vector3.forward;
-                    Vector3 targetSlipVelocity = worldDir.normalized * _slipSpeed;
-                    
-                    _slipVelocity = Vector3.Lerp(_slipVelocity, targetSlipVelocity, Time.deltaTime * _slipControlRate);
-                }
-                else
-                {   
-                    _slipVelocity *= _slipFriction;
-                    if (_slipVelocity.magnitude < _slipThreshold)
-                    {
-                        _slipVelocity = Vector3.zero;
-                    }
-                }
-                Vector3 vertical = new Vector3(0f, _verticalVelocity, 0f) * Time.deltaTime;
-                Vector3 moveAmount = _slipVelocity * Time.deltaTime;
-                
-                _controller.Move(moveAmount + vertical);
-                
-                _animationBlend = Mathf.Lerp(_animationBlend, _slipVelocity.magnitude, Time.deltaTime * SpeedChangeRate);
-                if (_hasAnimator)
-                {
-                    _animator.SetFloat(_animIDSpeed, _animationBlend);
-                    _animator.SetFloat(_animIDMotionSpeed, _input.move.magnitude);
-                }
-                return;
-            }
-
-            // --- 아래는 평소 이동 (원본 코드 유지) ---
-            if (currentHorizontalSpeed < targetSpeed - speedOffset ||
-                currentHorizontalSpeed > targetSpeed + speedOffset)
-            {
-                _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude,
-                    Time.deltaTime * SpeedChangeRate);
+                _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * SpeedChangeRate);
                 _speed = Mathf.Round(_speed * 1000f) / 1000f;
             }
-            else { _speed = targetSpeed; }
-
+            else
+            {
+                _speed = targetSpeed;
+            }
             _animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * SpeedChangeRate);
             if (_animationBlend < 0.01f) _animationBlend = 0f;
-            Vector3 inputDir = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
-            if (_input.move != Vector2.zero)
+            
+            // --- 회전 및 이동 방향 결정 ---
+            Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
+            Vector3 targetDirection;
+
+            // ✨ 조준 중이 아닐 때만 기존 방식으로 회전
+            if (!_isAiming && _input.move != Vector2.zero)
             {
-                _targetRotation = Mathf.Atan2(inputDir.x, inputDir.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
+                _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
                 float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity, RotationSmoothTime);
                 transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
             }
-            Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
+
+            // ✨ 조준 중일 때는 캐릭터의 현재 방향을 기준으로 이동 (스트레이핑)
+            if (_isAiming)
+            {
+                // 캐릭터의 로컬 방향(앞/옆)으로 이동 벡터를 만듭니다.
+                targetDirection = transform.right * inputDirection.x + transform.forward * inputDirection.z;
+            }
+            else
+            {
+                // 조준 중이 아닐 때는 기존 방식대로 이동
+                targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
+            }
+
+            // 최종 이동
             _controller.Move(targetDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+
+            // 애니메이터 업데이트
             if (_hasAnimator)
             {
+                // ✨ 스트레이핑 애니메이션을 위해 x, z 값을 직접 전달할 수도 있습니다.
+                // 예: _animator.SetFloat("InputX", _input.move.x);
+                // 예: _animator.SetFloat("InputY", _input.move.y);
                 _animator.SetFloat(_animIDSpeed, _animationBlend);
                 _animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
             }
         }
+
 
 
 
