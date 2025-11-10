@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections;
+
 
 public class WaterGunController : MonoBehaviour
 {
@@ -13,31 +15,50 @@ public class WaterGunController : MonoBehaviour
 
     [Header("물탱크 시스템")]
     public float maxWater = 100f;
-    public float waterConsumptionRate = 15f; // 초당 물 소모량
-    public float waterRegenRate = 10f; // 초당 물 회복량
+    public float waterConsumptionRate = 20f; // 초당 물 소모량
+    public float reloadTime = 2.0f; // 재장전에 걸리는 시간
     private float currentWater;
+
+    private bool isNearWaterSource = false; // 물 근처에 있는지 체크
+    private bool isReloading = false;       // 현재 재장전 중인지 체크
 
     [Header("VFX - 시각 효과")]
     public ParticleSystem waterStreamEffect; // 물줄기 파티클
     public GameObject waterSplashEffect; // 물보라(피격) 프리팹
 
+    private Animator playerAnimator; 
+    private int animIDisReloading;
+
     void Start()
     {
-        if (mainCamera == null)
-        {
-            mainCamera = Camera.main;
-        }
+        mainCamera = mainCamera ?? Camera.main;
         currentWater = maxWater;
 
         // 물줄기 파티클이 있으면 일단 정지
-        if (waterStreamEffect != null)
+        if (waterStreamEffect != null) waterStreamEffect.Stop();
+
+        playerAnimator = GetComponentInParent<Animator>();
+        if (playerAnimator == null)
         {
-            waterStreamEffect.Stop();
+            Debug.LogError("부모에게서 Player Animator를 찾을 수 없습니다!");
         }
+
+        // "Reload" 파라미터의 해시 ID를 미리 받아옴
+        animIDisReloading = Animator.StringToHash("isReloading");
     }
 
     void Update()
     {
+        // 재장전 중일 때는 모든 행동을 막습니다.
+        if (isReloading) return;
+
+         // 'R'키를 누르고, 물 근처에 있으며, 물이 가득 차지 않았을 때 재장전 시작
+        if (Input.GetKeyDown(KeyCode.R) && isNearWaterSource && currentWater < maxWater)
+        {
+            StartCoroutine(Reload());
+            return; // 재장전을 시작하면 다른 행동은 하지 않음
+        }
+
         // 마우스 좌클릭을 누르고 있으면 연속 발사
         if (Input.GetMouseButton(0) && currentWater > 0)
         {
@@ -59,13 +80,7 @@ public class WaterGunController : MonoBehaviour
         }
         else
         {
-            // 4. 안 쏘고 있으면 물 회복
-            if (currentWater < maxWater)
-            {
-                currentWater += waterRegenRate * Time.deltaTime;
-            }
-
-            // 5. 물줄기 파티클 정지
+            // 4. 물줄기 파티클 정지
             if (waterStreamEffect != null && waterStreamEffect.isPlaying)
             {
                 waterStreamEffect.Stop();
@@ -74,9 +89,6 @@ public class WaterGunController : MonoBehaviour
 
         // 물탱크 용량 제한
         currentWater = Mathf.Clamp(currentWater, 0, maxWater);
-        
-        // UI 업데이트 등...
-        // Debug.Log($"현재 물: {currentWater:F1}");
     }
 
     void Shoot()
@@ -111,7 +123,50 @@ public class WaterGunController : MonoBehaviour
         }
     }
 
-    // UI 표시용 함수
+    IEnumerator Reload()
+    {
+        if (isReloading) yield break;
+
+        isReloading = true;
+        if (playerAnimator != null)
+        {
+            playerAnimator.SetBool("isReloading", true);
+        }
+
+        yield return new WaitForSeconds(reloadTime); // reloadTime 만큼 대기
+        
+
+        currentWater = maxWater;
+
+        // isReloading 불(bool) 파라미터를 false로 설정하여 루프 애니메이션 정지
+        if (playerAnimator != null)
+        {
+            playerAnimator.SetBool(animIDisReloading, false);
+        }
+
+        isReloading = false;
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        // 들어간 콜라이더의 태그가 "WaterSource"이면
+        if (other.CompareTag("WaterSource"))
+        {
+            isNearWaterSource = true;
+            // 여기에 "Press R to Reload" 같은 UI를 띄워주면 더 좋습니다.
+        }
+    }
+
+    // 트리거 콜라이더에서 나올 때 호출됨
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("WaterSource"))
+        {
+            isNearWaterSource = false;
+            // "Press R to Reload" UI를 숨깁니다.
+        }
+    }
+
     public float GetWaterRatio()
     {
         return currentWater / maxWater;

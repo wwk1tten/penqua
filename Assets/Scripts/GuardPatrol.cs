@@ -68,6 +68,7 @@ public class GuardPatrol : MonoBehaviour
     private Vector3 originalPosition;
     // 애니메이터 파라미터
     private int _animIDFall;
+    private int _animIDHit;
 
     void Start(){
         agent = GetComponent<NavMeshAgent>();
@@ -81,6 +82,7 @@ public class GuardPatrol : MonoBehaviour
 
         // 애니메이터 파라미터 캐싱
         _animIDFall = Animator.StringToHash("Fall");
+        _animIDHit = Animator.StringToHash("Hit");
         
         agent.speed = patrolSpeed;
 
@@ -443,13 +445,13 @@ public class GuardPatrol : MonoBehaviour
     /// 물총에 맞음 (외부에서 호출됨)
     /// </summary>
     public void TakeWaterDamage(float damage, Vector3 hitPoint){
+        if (animator != null)
+        {
+            animator.SetTrigger(_animIDHit);
+        }
         currentWetness = Mathf.Min(currentWetness + damage, maxWetness);
-        
         Debug.Log($"[{gameObject.name}] 물총 맞음! 젖음 증가: {currentWetness:F1}");
-        
-        // 선택: 맞은 지점에서 파티클 효과
-        // Instantiate(waterHitEffect, hitPoint, Quaternion.identity);
-        
+    
         // 필요시 경비원을 잠시 혼란 상태로 만들기
         if (currentWetness >= maxWetness)
         {
