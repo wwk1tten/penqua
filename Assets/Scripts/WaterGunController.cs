@@ -32,6 +32,15 @@ public class WaterGunController : MonoBehaviour
     [Header("VFX - 시각 효과")]
     public ParticleSystem waterStreamEffect; // 물줄기 파티클
     public GameObject waterSplashEffect; // 물보라(피격) 프리팹
+    [Header("NavMeshAgent")]
+    public GameObject navObstaclePrefab; // NavPuddle_Obstacle 프리팹 연결 (1단계에서 만든 것)
+    public float puddleDuration = 10f; // 물웅덩이 유지 시간
+    [Header("Audio Settings")]
+    public AudioSource audioSource; // 인스펙터에서 Audio Source 컴포넌트 연결
+    public AudioClip shootSound;     // 물총 발사 시 재생할 소리
+    public AudioClip reloadSound;      // 재장전 시 재생할 소리
+    public AudioClip guardHitSound;         // 4. 경비원 피격 소리 (Guard에게 닿을 때)
+    public AudioClip puddleSplashSound;
 
 
 
@@ -118,6 +127,12 @@ public class WaterGunController : MonoBehaviour
             {
                 Instantiate(waterSplashEffect, hit.point, Quaternion.LookRotation(hit.normal));
             }
+
+            // 발사 사운드 재생
+                    if (audioSource != null && shootSound != null)
+                    {
+                        audioSource.PlayOneShot(shootSound); 
+                    }
             
             // 경비원에게 젖음 피해
             if (hit.collider.CompareTag("Guard"))
@@ -127,6 +142,12 @@ public class WaterGunController : MonoBehaviour
                 {
                     // 연속 발사이므로 피해량을 시간에 맞춰 조절
                     guard.TakeWaterDamage(1f, hit.point); 
+                }
+
+                // 발사 사운드 재생
+                if (audioSource != null && guardHitSound != null)
+                {
+                    audioSource.PlayOneShot(guardHitSound); 
                 }
             }
         }
@@ -141,11 +162,19 @@ public class WaterGunController : MonoBehaviour
         {
             if (hit.collider.CompareTag("Floor"))
             {
-                // [추가] 이전 물웅덩이와의 거리가 충분히 멀 때만 생성
+                // 이전 물웅덩이와의 거리가 충분히 멀 때만 생성
                 if (Vector3.Distance(hit.point, lastPuddlePosition) >= puddleMinDistance)
                 {
+                    // 웅덩이 사운드 재생
+                    if (audioSource != null && puddleSplashSound != null)
+                    {
+                        audioSource.PlayOneShot(puddleSplashSound); 
+                    }
+
                     CreateWaterPuddle(hit.point, hit.normal);
                     lastPuddlePosition = hit.point;
+
+                    
                 }
             }
         }
@@ -153,20 +182,24 @@ public class WaterGunController : MonoBehaviour
 
     void CreateWaterPuddle(Vector3 position, Vector3 normal)
     {
-        if (waterPuddlePrefab == null) return;
+        if (waterPuddlePrefab == null || navObstaclePrefab == null) 
+        {
+            Debug.LogError("Puddle Prefab 또는 Nav Obstacle Prefab이 연결되지 않았습니다!");
+            return;
+        }
         
+        // **A. 시각 효과 (Visual Puddle) 생성**
         Quaternion alignToSurface = Quaternion.FromToRotation(Vector3.up, normal);
         Quaternion randomSpin = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
         Quaternion finalRot = alignToSurface * randomSpin;
-        
-        Vector3 puddlePos = position + normal * 0.01f; // 바닥 위로 살짝 띄우기 (Z-Fighting 방지)
+        Vector3 puddlePos = position + normal * 0.01f; // 바닥 위로 살짝 띄우기
 
-        // **(2) 성능 최적화:** Instantiate 대신 오브젝트 풀링 사용 가정
-        // (실제 코드에서는 PuddleManager.Instance.GetPuddle() 등을 사용해야 합니다)
-        // 현재는 이해를 돕기 위해 Instantiate 사용
-        GameObject puddle = Instantiate(waterPuddlePrefab, puddlePos, finalRot); 
+        GameObject visualPuddle = Instantiate(waterPuddlePrefab, puddlePos, finalRot);
+        GameObject navObstacle = Instantiate(navObstaclePrefab, puddlePos, finalRot);
 
-        Destroy(puddle, 10f); 
+        // 파티클 시스템이 스스로 사라지는 시간과 Obstacle 제거 시간을 맞춥니다.
+        Destroy(visualPuddle, puddleDuration);
+        Destroy(navObstacle, puddleDuration); 
     }
 
     IEnumerator Reload()
@@ -177,6 +210,12 @@ public class WaterGunController : MonoBehaviour
         if (playerAnimator != null)
         {
             playerAnimator.SetBool("isReloading", true);
+        }
+
+        // 발사 사운드 재생
+        if (audioSource != null && reloadSound != null)
+        {
+            audioSource.PlayOneShot(reloadSound); 
         }
 
         yield return new WaitForSeconds(reloadTime); // reloadTime 만큼 대기
