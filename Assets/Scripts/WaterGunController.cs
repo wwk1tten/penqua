@@ -22,9 +22,18 @@ public class WaterGunController : MonoBehaviour
     private bool isNearWaterSource = false; // 물 근처에 있는지 체크
     private bool isReloading = false;       // 현재 재장전 중인지 체크
 
+    [Header("물웅덩이")]
+    public float puddleSpawnInterval = 0.1f;
+    public float puddleMinDistance = 0.5f; // 이전 물웅덩이와 최소 거리
+    public GameObject waterPuddlePrefab;
+    private float nextPuddleTime = 0f;
+    private Vector3 lastPuddlePosition = Vector3.zero;
+
     [Header("VFX - 시각 효과")]
     public ParticleSystem waterStreamEffect; // 물줄기 파티클
     public GameObject waterSplashEffect; // 물보라(피격) 프리팹
+
+
 
     private Animator playerAnimator; 
     private int animIDisReloading;
@@ -77,6 +86,12 @@ public class WaterGunController : MonoBehaviour
                 nextFireTime = Time.time + 1f / fireRate;
                 Shoot();
             }
+            // + 물웅덩이는 더 자주 체크하여 생성
+            if (Time.time >= nextPuddleTime)
+            {
+                nextPuddleTime = Time.time + puddleSpawnInterval;
+                CheckAndCreatePuddle();
+            }
         }
         else
         {
@@ -103,12 +118,6 @@ public class WaterGunController : MonoBehaviour
             {
                 Instantiate(waterSplashEffect, hit.point, Quaternion.LookRotation(hit.normal));
             }
-
-            // 바닥에 맞으면 물웅덩이 생성
-            if (hit.collider.CompareTag("Floor"))
-            {
-                // Instantiate(waterPuddlePrefab, hit.point, ...);
-            }
             
             // 경비원에게 젖음 피해
             if (hit.collider.CompareTag("Guard"))
@@ -121,6 +130,43 @@ public class WaterGunController : MonoBehaviour
                 }
             }
         }
+    }
+
+    // [추가] 물웅덩이 생성만 담당하는 별도 함수
+    void CheckAndCreatePuddle()
+    {
+        Ray ray = mainCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+    
+        if (Physics.Raycast(ray, out RaycastHit hit, shootRange))
+        {
+            if (hit.collider.CompareTag("Floor"))
+            {
+                // [추가] 이전 물웅덩이와의 거리가 충분히 멀 때만 생성
+                if (Vector3.Distance(hit.point, lastPuddlePosition) >= puddleMinDistance)
+                {
+                    CreateWaterPuddle(hit.point, hit.normal);
+                    lastPuddlePosition = hit.point;
+                }
+            }
+        }
+    }
+
+    void CreateWaterPuddle(Vector3 position, Vector3 normal)
+    {
+        if (waterPuddlePrefab == null) return;
+        
+        Quaternion alignToSurface = Quaternion.FromToRotation(Vector3.up, normal);
+        Quaternion randomSpin = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+        Quaternion finalRot = alignToSurface * randomSpin;
+        
+        Vector3 puddlePos = position + normal * 0.01f; // 바닥 위로 살짝 띄우기 (Z-Fighting 방지)
+
+        // **(2) 성능 최적화:** Instantiate 대신 오브젝트 풀링 사용 가정
+        // (실제 코드에서는 PuddleManager.Instance.GetPuddle() 등을 사용해야 합니다)
+        // 현재는 이해를 돕기 위해 Instantiate 사용
+        GameObject puddle = Instantiate(waterPuddlePrefab, puddlePos, finalRot); 
+
+        Destroy(puddle, 10f); 
     }
 
     IEnumerator Reload()

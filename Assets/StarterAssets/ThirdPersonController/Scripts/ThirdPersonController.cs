@@ -226,7 +226,6 @@ namespace StarterAssets
             // 이 로직을 LateUpdate로 옮겨 피드백 루프를 방지합니다.
             if (_isAiming)
             {
-                Debug.Log("Aiming");
                 float targetYaw = _mainCamera.transform.rotation.eulerAngles.y;
                 Quaternion targetRotation = Quaternion.Euler(0.0f, targetYaw, 0.0f);
                 
