@@ -556,7 +556,6 @@ namespace StarterAssets
             {
                 _isSwimming = true;
                 _animator.SetBool("isSwimming", _isSwimming);
-                Debug.Log("isSwimming");
             }
 
             else if (other.CompareTag("WaterPuddle") && !isStunned)

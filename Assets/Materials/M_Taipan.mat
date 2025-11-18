@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: M_Taipan
-  m_Shader: {fileID: -6465566751694194690, guid: a44401f8b3d263c4e9c2ed62b3f5adff, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 1374f3f82cbaa46acba3ba9f1a4d473b, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -24,8 +24,36 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - Texture2D_df814fb1718447f4b430f7939cffe52f:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - Texture2D_ec98d4cc965840bca2bbd19bbe3bcaa2:
+        m_Texture: {fileID: 2800000, guid: 1b144d38caf89b047936f31afb09ca0f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: b6e7fedc1523cb243a59efe64a66526a, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Diffuse:
+        m_Texture: {fileID: 2800000, guid: 7f3b8585533534d8c8bf5bdbe8a396ab, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: b6e7fedc1523cb243a59efe64a66526a, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Normal:
+        m_Texture: {fileID: 2800000, guid: e6b2e5815762b4698a2a28651fb00809, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Puddles:
+        m_Texture: {fileID: 2800000, guid: c6b1533c682b0494a82246bda5b2b4a6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Ripple:
+        m_Texture: {fileID: 2800000, guid: cfd095450166d46ef95ff6726abbbdd6, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -42,11 +70,31 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Emission: 0.5
+    - Vector1_30c2129fc1b14cacae4c5402852fa917: 0
+    - Vector1_37b76b9c07d44458b9429b61f50a34f5: 0.7
+    - Vector1_8614bb1a761745dbb2966a762489c4ff: 7
+    - Vector1_ab5bbc78aace46cca47c976624c57654: 0.01
+    - Vector1_ca96e47f336c4f3e94f6e18dd5768814: 0
+    - Vector1_cdc7ed99026b45b2b6defe364c7cf018: 0
+    - Vector1_ddb6293edce643b0ad001ef8e4bfe970: 0
+    - Vector1_f64f7fc51f514d1fa0c302cd1c54ace5: 0
+    - _DrySmoothness: 0.02
+    - _Emission: 1
+    - _Flow: 1
+    - _FlowTiling: 0
     - _QueueControl: 0
     - _QueueOffset: 0
+    - _WetSmoothness: 0.8
+    - _Wetness: 0
+    - _WetnessAmount: 0
     m_Colors:
-    - _Color: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 1, g: 0, b: 0, a: 1}
+    - _MainTiling: {r: 15, g: 15, b: 0, a: 0}
+    - _RippleSpeed: {r: 1, g: 1, b: 0, a: 0}
+    - _RippleTiling: {r: 1, g: 1, b: 0, a: 0}
+    - _SmoothTiling: {r: 1.5, g: 1.5, b: 0, a: 0}
+    - _WetColorMultiplier: {r: 0.6421324, g: 0.6943179, b: 0.6981132, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &4592578026931621343

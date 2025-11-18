@@ -16,6 +16,7 @@ public class WaterGunController : MonoBehaviour
     [Header("물탱크 시스템")]
     public float maxWater = 100f;
     public float waterConsumptionRate = 20f; // 초당 물 소모량
+    public float puddleConsumptionRate = 50f; // 웅덩이 생성시 물 소모량
     public float reloadTime = 2.0f; // 재장전에 걸리는 시간
     private float currentWater;
 
@@ -82,19 +83,27 @@ public class WaterGunController : MonoBehaviour
         {
             // 1. 물 소모
             currentWater -= waterConsumptionRate * Time.deltaTime;
-            
-            // 2. 물줄기 파티클 재생
-            if (waterStreamEffect != null && !waterStreamEffect.isPlaying)
-            {
-                waterStreamEffect.Play();
-            }
 
-            // 3. 발사 속도에 맞춰 Shoot() 함수 호출
+            // 2. 발사 속도에 맞춰 Shoot() 함수 호출
             if (Time.time >= nextFireTime)
             {
                 nextFireTime = Time.time + 1f / fireRate;
                 Shoot();
             }
+
+            // 3. 물줄기 파티클 재생
+            if (waterStreamEffect != null)
+            {
+                // 파티클이 재생 중이 아니면 재생 시작
+                if (!waterStreamEffect.isPlaying)
+                {
+                    waterStreamEffect.Play();
+                }
+                
+                // 파티클 방향을 조준점에 맞춤
+                AdjustParticleDirection();
+            }
+
             // + 물웅덩이는 더 자주 체크하여 생성
             if (Time.time >= nextPuddleTime)
             {
@@ -153,41 +162,69 @@ public class WaterGunController : MonoBehaviour
         }
     }
 
-    // [추가] 물웅덩이 생성만 담당하는 별도 함수
-    void CheckAndCreatePuddle()
+    void AdjustParticleDirection() // 파티클 방향을 조절하는 함수
     {
+        // 화면 중앙에서 레이 발사
+        Ray ray = mainCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        Vector3 targetPoint;
+
+        // 레이가 어딘가에 맞았다면 그 지점을 목표로 함
+        if (Physics.Raycast(ray, out RaycastHit hit, shootRange))
+        {
+            targetPoint = hit.point;
+        }
+        else // 아무것도 맞지 않았다면, 최대 사거리의 지점을 목표로 함
+        {
+            targetPoint = ray.GetPoint(shootRange);
+        }
+
+        // 총구 위치에서 목표 지점을 향하는 방향 계산
+        Vector3 direction = targetPoint - waterStreamEffect.transform.position;
+        
+        // 파티클 시스템의 Transform을 해당 방향으로 회전시킴
+        waterStreamEffect.transform.rotation = Quaternion.LookRotation(direction);
+    }
+    
+    void CheckAndCreatePuddle() // 물웅덩이 생성만 담당하는 별도 함수
+    {
+        if (currentWater < puddleConsumptionRate) return;
         Ray ray = mainCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
     
         if (Physics.Raycast(ray, out RaycastHit hit, shootRange))
         {
             if (hit.collider.CompareTag("Floor"))
             {
-                // 이전 물웅덩이와의 거리가 충분히 멀 때만 생성
-                if (Vector3.Distance(hit.point, lastPuddlePosition) >= puddleMinDistance)
-                {
-                    // 웅덩이 사운드 재생
-                    if (audioSource != null && puddleSplashSound != null)
-                    {
-                        audioSource.PlayOneShot(puddleSplashSound); 
+                // 표면의 기울기를 확인. normal.y가 1에 가까울수록 평평한 바닥.
+                // 0.7f 이상이면 충분히 평평하다고 간주.
+                if (hit.normal.y >= 0.7f) {
+                    // 이전 물웅덩이와의 거리가 충분히 멀 때만 생성
+                    if (Vector3.Distance(hit.point, lastPuddlePosition) >= puddleMinDistance){
+                        bool created = CreateWaterPuddle(hit.point, hit.normal);
+                        if (created)
+                        {
+                            currentWater -= puddleConsumptionRate;
+                            lastPuddlePosition = hit.point;
+                        }
+                        // 웅덩이 사운드 재생
+                        if (audioSource != null && puddleSplashSound != null)
+                        {
+                            audioSource.PlayOneShot(puddleSplashSound); 
+                        }
+
+                        CreateWaterPuddle(hit.point, hit.normal);
+                        lastPuddlePosition = hit.point;  
                     }
-
-                    CreateWaterPuddle(hit.point, hit.normal);
-                    lastPuddlePosition = hit.point;
-
-                    
                 }
             }
         }
     }
 
-    void CreateWaterPuddle(Vector3 position, Vector3 normal)
+    bool CreateWaterPuddle(Vector3 position, Vector3 normal)
     {
-        if (waterPuddlePrefab == null || navObstaclePrefab == null) 
-        {
-            Debug.LogError("Puddle Prefab 또는 Nav Obstacle Prefab이 연결되지 않았습니다!");
-            return;
-        }
+        if (waterPuddlePrefab == null || navObstaclePrefab == null) return false;
         
+        if (currentWater < puddleConsumptionRate) return false;
+
         // **A. 시각 효과 (Visual Puddle) 생성**
         Quaternion alignToSurface = Quaternion.FromToRotation(Vector3.up, normal);
         Quaternion randomSpin = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
@@ -200,6 +237,8 @@ public class WaterGunController : MonoBehaviour
         // 파티클 시스템이 스스로 사라지는 시간과 Obstacle 제거 시간을 맞춥니다.
         Destroy(visualPuddle, puddleDuration);
         Destroy(navObstacle, puddleDuration); 
+
+        return true;
     }
 
     IEnumerator Reload()

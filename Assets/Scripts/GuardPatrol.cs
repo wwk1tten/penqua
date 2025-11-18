@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -53,6 +54,8 @@ public class GuardPatrol : MonoBehaviour
     public float stunWetness = 80f;
     private float currentWetness = 0f;
     public float wetnessDecayRate = 5f; // 초당 회복 속도
+    private List<Material> wetnessMaterials = new List<Material>();
+    private Material guardMaterial;
     [Header("Stun")]
     public float puddleSpeedMultiplier = 0.5f; // 50% 속도로 감소
     public float fallStunDuration = 1.5f; // 넘어졌을 때 스턴 시간
@@ -97,6 +100,23 @@ public class GuardPatrol : MonoBehaviour
             enabled = false;
             return;
         }
+
+        SkinnedMeshRenderer[] allRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
+        
+        if (allRenderers.Length > 0)
+        {
+            foreach (var renderer in allRenderers)
+            {
+                // 각 렌더러의 머티리얼에 대한 인스턴스를 생성하고 리스트에 추가
+                // 이렇게 하면 원본 머티리얼 에셋은 건드리지 않게 됨
+                wetnessMaterials.Add(renderer.material); 
+            }
+        }
+        else
+        {
+            Debug.LogError($"[{gameObject.name}]에서 SkinnedMeshRenderer를 찾을 수 없습니다!");
+        }
+
         SetDestination();
     }
 
@@ -111,7 +131,8 @@ public class GuardPatrol : MonoBehaviour
             currentWetness = Mathf.Max(0, currentWetness);
         }
         
-        // 젖음에 따라 속도 조정
+        // 젖음에 따라 속도, 시각화 조정
+        UpdateWetnessEffect();
         UpdateSpeedByWetness();
         // 플레이어 감지 확인
         DetectPlayer();
@@ -439,6 +460,18 @@ public class GuardPatrol : MonoBehaviour
                 break;
         }
     }
+    void UpdateWetnessEffect()
+    {
+        if (wetnessMaterials.Count == 0) return;
+        
+        float wetnessRatio = currentWetness / maxWetness;
+        
+        // 리스트에 있는 모든 머티리얼의 _Wetness 값을 업데이트
+        foreach (var mat in wetnessMaterials)
+        {
+            mat.SetFloat("_Wetness", wetnessRatio);
+        }
+    }
 
 
     /// <summary>
@@ -450,7 +483,6 @@ public class GuardPatrol : MonoBehaviour
             animator.SetTrigger(_animIDHit);
         }
         currentWetness = Mathf.Min(currentWetness + damage, maxWetness);
-        Debug.Log($"[{gameObject.name}] 물총 맞음! 젖음 증가: {currentWetness:F1}");
     
         // 필요시 경비원을 잠시 혼란 상태로 만들기
         if (currentWetness >= maxWetness)
