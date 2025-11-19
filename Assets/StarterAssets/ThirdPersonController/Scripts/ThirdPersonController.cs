@@ -1,8 +1,22 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM 
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 #endif
+
+public struct CapsuleData
+{
+    public string capsuleID;
+    public GameObject animalPrefab;
+    public Sprite capsuleIcon; // UI에 표시할 아이콘
+}
+
+public class PlayerInteraction : MonoBehaviour
+{
+    // ... 이하 스크립트 내용
+}
 
 /* Note: animations are called via the controller for both the character and capsule using animator null checks
  */
@@ -96,6 +110,17 @@ namespace StarterAssets
         [Tooltip("How fast the character rotates to face the camera direction while aiming.")]
         public float AimRotationSpeed = 20f;
         private bool _isAiming;
+        [Header("Capsule")]
+        public int inventorySize = 3;
+        public List<Image> inventorySlots; // UI 슬롯 이미지들을 담을 리스트
+        public Color selectedSlotColor = Color.yellow; // 선택된 슬롯 테두리 색
+        public Color defaultSlotColor = Color.white;   // 기본 슬롯 테두리 색
+        
+        // [변경점 1] 인벤토리 타입 변경
+        private List<CapsuleData> inventory = new List<CapsuleData>();
+        private int currentInventoryIndex = -1;
+        private Camera mainCamera;
+    
 
         // cinemachine
         private float _cinemachineTargetYaw;
@@ -129,8 +154,6 @@ namespace StarterAssets
         private int _animIDIsSwimming;
         private int _animIDIsRolling;
         private int _animIDIsAiming;
-        // Animator aniamtion IDs
-
 
 
 #if ENABLE_INPUT_SYSTEM 
@@ -158,10 +181,11 @@ namespace StarterAssets
 #endif
             }
         }
-
+       
 
         private void Awake(){
             // get a reference to our main camera
+            mainCamera = Camera.main;
             if (_mainCamera == null)
             {
                 _mainCamera = GameObject.FindGameObjectWithTag("MainCamera");
@@ -181,6 +205,7 @@ namespace StarterAssets
 #endif
 
             AssignAnimationIDs();
+            UpdateInventoryUI();
 
             // reset our timeouts on start
             _jumpTimeoutDelta = JumpTimeout;
@@ -206,6 +231,7 @@ namespace StarterAssets
                 return; // 조작 불가
             }
 
+            Inventory();
             HandleAiming(); 
             JumpAndGravity();
             GroundedCheck();
@@ -412,10 +438,6 @@ namespace StarterAssets
             }
         }
 
-
-
-
-
         private void JumpAndGravity()
         {
             if (_isSwimming)
@@ -506,6 +528,68 @@ namespace StarterAssets
             }
         }
 
+        private void Inventory()
+        {
+            if (Input.GetKeyDown(KeyCode.Q) && currentInventoryIndex != -1)
+            {
+                Ray ray = mainCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+                if (Physics.Raycast(ray, out RaycastHit hit, 50f))
+                {
+                    if (hit.collider.CompareTag("WaterSource")) ActivateCapsule(hit.point);
+                }
+            }
+
+            float scroll = Input.GetAxis("Mouse ScrollWheel");
+            if (scroll != 0f && inventory.Count > 0)
+            {
+                currentInventoryIndex += (scroll > 0f) ? 1 : -1;
+                if (currentInventoryIndex >= inventory.Count) currentInventoryIndex = 0;
+                if (currentInventoryIndex < 0) currentInventoryIndex = inventory.Count - 1;
+                
+                UpdateInventoryUI(); // 아이템 선택 변경 시 UI 업데이트
+            }
+        }
+    
+        void ActivateCapsule(Vector3 activationPoint)
+        {
+            CapsuleData capsuleToActivate = inventory[currentInventoryIndex];
+            
+            if (capsuleToActivate.animalPrefab != null)
+            {
+                Instantiate(capsuleToActivate.animalPrefab, activationPoint, Quaternion.identity);
+            }
+            
+            GameManager.Instance.OnCapsuleCollected(capsuleToActivate.capsuleID);
+            inventory.RemoveAt(currentInventoryIndex);
+            
+            currentInventoryIndex = (inventory.Count > 0) ? 0 : -1;
+            UpdateInventoryUI();
+        }
+        
+        void UpdateInventoryUI()
+        {
+            for (int i = 0; i < inventorySlots.Count; i++)
+            {
+                // 인벤토리에 아이템이 있는 경우
+                if (i < inventory.Count)
+                {
+                    inventorySlots[i].sprite = inventory[i].capsuleIcon;
+                    inventorySlots[i].color = new Color(1, 1, 1, 1); // 보이게
+                }
+                else // 빈 슬롯인 경우
+                {
+                    inventorySlots[i].sprite = null;
+                    inventorySlots[i].color = new Color(1, 1, 1, 0.5f); // 반투명하게
+                }
+                
+                // 현재 선택된 슬롯 테두리 강조
+                Image slotBorder = inventorySlots[i].transform.parent.GetComponent<Image>();
+                if (slotBorder != null)
+                {
+                    slotBorder.color = (i == currentInventoryIndex) ? selectedSlotColor : defaultSlotColor;
+                }
+            }
+        }
         private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
         {
             if (lfAngle < -360f) lfAngle += 360f;
@@ -549,7 +633,7 @@ namespace StarterAssets
                 AudioSource.PlayClipAtPoint(LandingAudioClip, transform.TransformPoint(_controller.center), FootstepAudioVolume);
             }
         }
-        // water entered
+        
         private void OnTriggerEnter(Collider other)
         {
             if ((waterMask & (1 << other.gameObject.layer)) != 0)
@@ -575,6 +659,25 @@ namespace StarterAssets
                     _slideVelocity = currentVel;
                 }
                 Debug.Log("Slippery in");
+            }
+
+            else if (other.TryGetComponent<CapsuleController>(out CapsuleController capsule))
+            {
+                if (inventory.Count < inventorySize)
+                {
+                    // [변경점 2] 오브젝트가 아닌 '데이터'를 생성하여 인벤토리에 추가
+                    CapsuleData newData = new CapsuleData
+                    {
+                        capsuleID = capsule.capsuleID,
+                        animalPrefab = capsule.animalPrefab,
+                        capsuleIcon = capsule.capsuleIcon
+                    };
+                    inventory.Add(newData);
+
+                    currentInventoryIndex = inventory.Count - 1;
+                    Destroy(capsule.gameObject);
+                    UpdateInventoryUI(); // 아이템 획득 시 UI 업데이트
+                }
             }
         }
 
