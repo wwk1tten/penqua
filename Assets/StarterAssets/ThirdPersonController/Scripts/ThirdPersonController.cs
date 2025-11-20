@@ -70,6 +70,8 @@ namespace StarterAssets
 
         [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
         public float GroundedRadius = 0.28f;
+        [Tooltip("Crouch speed of the character in m/s")]
+        public float CrouchingSpeed = 1.5f;
 
         [Tooltip("What layers the character uses as ground")]
         public LayerMask GroundLayers;
@@ -154,6 +156,7 @@ namespace StarterAssets
         private int _animIDIsSwimming;
         private int _animIDIsRolling;
         private int _animIDIsAiming;
+        private int _animIDIsCrouching;
 
 
 #if ENABLE_INPUT_SYSTEM 
@@ -167,7 +170,7 @@ namespace StarterAssets
         
 
         private const float _threshold = 0.01f;
-
+        private bool _isCrouching = false;
         private bool _isOnPuddle = false;
         private bool _hasAnimator;
         private bool IsCurrentDeviceMouse
@@ -232,6 +235,7 @@ namespace StarterAssets
             }
 
             Inventory();
+            HandleCrouchInput();
             HandleAiming(); 
             JumpAndGravity();
             GroundedCheck();
@@ -282,6 +286,7 @@ namespace StarterAssets
             _animIDFreeFall = Animator.StringToHash("FreeFall");
             _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
             _animIDIsSwimming = Animator.StringToHash("isSwimming");
+            _animIDIsCrouching = Animator.StringToHash("IsCrouching");
         }
 
         private void GroundedCheck(){
@@ -326,7 +331,8 @@ namespace StarterAssets
             // 1. 조준 상태 로직
             if (_isAiming)
             {
-                targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
+                targetSpeed = _isCrouching ? CrouchingSpeed : (_input.sprint ? SprintSpeed : MoveSpeed);
+
                 if (_input.move == Vector2.zero) targetSpeed = 0.0f;
 
                 float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
@@ -397,9 +403,8 @@ namespace StarterAssets
                 }
             }
             // 3. 일반 및 수영 상태 로직 (이하 동일)
-            else
-            {
-                targetSpeed = _isSwimming ? swimSpeed : (_input.sprint ? SprintSpeed : MoveSpeed);
+            else {
+                targetSpeed = _isCrouching ? CrouchingSpeed : (_isSwimming ? swimSpeed : (_input.sprint ? SprintSpeed : MoveSpeed));
                 if (_input.move == Vector2.zero) targetSpeed = 0.0f;
 
                 float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
@@ -527,7 +532,18 @@ namespace StarterAssets
                 _verticalVelocity += Gravity * Time.deltaTime;
             }
         }
-
+        private void HandleCrouchInput()
+        {
+            // C키를 눌렀을 때
+            if (Input.GetKeyDown(KeyCode.C))
+            {
+                // 앉기 상태를 토글(반전)
+                _isCrouching = !_isCrouching;
+                
+                // 애니메이터에 상태 전달
+                _animator.SetBool(_animIDIsCrouching, _isCrouching);
+            }
+        }
         private void Inventory()
         {
             if (Input.GetKeyDown(KeyCode.Q) && currentInventoryIndex != -1)
@@ -611,8 +627,9 @@ namespace StarterAssets
                 GroundedRadius);
         }
 
-        private void OnFootstep(AnimationEvent animationEvent)
-        {
+        private void OnFootstep(AnimationEvent animationEvent){
+            if (_isCrouching) return; 
+
             if (animationEvent.animatorClipInfo.weight > 0.5f)
             {
                 if (FootstepAudioClips.Length > 0)
