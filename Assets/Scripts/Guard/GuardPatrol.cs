@@ -61,6 +61,12 @@ public class GuardPatrol : MonoBehaviour
     public float fallStunDuration = 1.5f; // 넘어졌을 때 스턴 시간
     private bool isInPuddle = false;
     private bool isFalling = false; // 넘어지는 중
+    [Header("Attack")]
+    public float attackRange = 1.5f; // 공격이 가능한 거리
+    public int attackDamage = 10;   // 공격 당 피해량
+    public float attackCooldown = 2f; // 공격 간의 쿨타임 (2초에 한 번)
+    private float _nextAttackTime = 0f;
+    public float knockbackForce = 8f;
 
     // 기본 속도 저장
     private float basePatrolSpeed;
@@ -268,26 +274,66 @@ public class GuardPatrol : MonoBehaviour
     /// <summary>
     /// 추격 상태 업데이트
     /// </summary>
-    void UpdateChase(){
-        // UI 활성화
-        if (alertUI != null)
-        {
-            alertUI.SetActive(true);
-        }
+    
+    void UpdateChase()
+    {
+        if (alertUI != null) alertUI.SetActive(true);
         
-        // 플레이어를 향해 이동
-        if (playerTarget != null)
+        if (playerTarget == null) 
+        { 
+            ChangeState(GuardState.Return); 
+            return; 
+        }
+
+        float dist = Vector3.Distance(transform.position, playerTarget.position);
+
+        // 1. 공격 사거리 진입
+        if (dist <= attackRange)
         {
-            agent.destination = playerTarget.position;
+            // [핵심 1] 에이전트 완전 무력화
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+            agent.ResetPath(); 
+            agent.updateRotation = false; // [중요] 에이전트야, 넌 회전 건드리지 마!
+
+            // [핵심 2] 우리가 직접 플레이어 바라보게 함
+            Vector3 dir = (playerTarget.position - transform.position).normalized;
+            dir.y = 0; // 고개 위아래로 까닥거리는 것 방지
+            
+            if (dir != Vector3.zero)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(dir);
+                // 회전 속도를 10f -> 20f로 높여서 더 빠릿하게 쳐다보게 함
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 20f);
+            }
+
+            // 공격 시도
+            if (Time.time >= _nextAttackTime)
+            {
+                AttackPlayer();
+            }
+        }
+        // 2. 추격 중
+        else
+        {
+            // [핵심 3] 다시 이동 모드로 복구
+            agent.updateRotation = true; // 에이전트야, 다시 네가 알아서 회전해
+            if (agent.isStopped) agent.isStopped = false;
+            
+            agent.SetDestination(playerTarget.position);
             lastKnownPosition = playerTarget.position;
         }
-        
-        // 플레이어를 놓쳤는지 확인
+
         if (sensor != null && sensor.Objects.Count == 0)
         {
+            agent.updateRotation = true; // 상태 나갈 때도 복구 필수!
+            agent.isStopped = false;
             ChangeState(GuardState.Return);
         }
     }
+
+
+
 
     /// <summary>
     /// 복귀 상태 업데이트
@@ -418,7 +464,6 @@ public class GuardPatrol : MonoBehaviour
         }
     }
 
-
     public void OnSoundHeard(Vector3 soundPosition)
     {
         float distance = Vector3.Distance(transform.position, soundPosition);
@@ -513,17 +558,6 @@ public class GuardPatrol : MonoBehaviour
                 StartCoroutine(FallInPuddleCoroutine());
             }
         }
-        else if (other.CompareTag("Player"))
-        {
-            // 인터페이스를 통해 안전하게 접근
-            IDamageable damageable = other.GetComponent<IDamageable>();
-            
-            if (damageable != null)
-            {
-                // 데미지 1을 주고, 내 위치(transform.position)를 전달하여 넉백 방향 계산
-                damageable.TakeDamage(1, transform.position);
-            }
-        }
     }
     private void OnTriggerStay(Collider other)
     {
@@ -562,8 +596,33 @@ public class GuardPatrol : MonoBehaviour
 
         isFalling = false;
         agent.isStopped = false;
-
     }
+
+    private void AttackPlayer()
+    {
+        _nextAttackTime = Time.time + attackCooldown;
+
+        // 애니메이션 트리거 (있으면)
+        if (animator != null)
+            animator.SetTrigger("Attack");
+
+        // 방향 계산 (경비원 -> 플레이어)
+        Vector3 dir = playerTarget.position - transform.position;
+        dir.y = 0f;
+        dir.Normalize();
+
+        // 플레이어에 IDamageable 있으면 호출
+        if (playerTarget.TryGetComponent<IDamageable>(out var dmg))
+        {
+            Debug.Log("Guard 공격 성공, TakeDamage 호출");
+            dmg.TakeDamage(attackDamage, playerTarget.position, dir, knockbackForce);
+        }
+        else
+        {
+            Debug.LogWarning("Player에 IDamageable 구현이 없음");
+        }
+    }
+
     void OnDrawGizmos(){
         if (waypoints == null || waypoints.Length < 2) return;
         

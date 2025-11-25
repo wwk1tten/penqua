@@ -1,109 +1,83 @@
 using UnityEngine;
-using UnityEngine.Events;
-using System.Collections;
-using StarterAssets;
+using UnityEngine.UI;
 
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
-    [Header("Health Settings")]
-    public int maxHealth = 3;
-    private int currentHealth;
+    [Header("하트 설정")]
+    public int maxHearts = 3;
+    public int currentHearts;
 
-    // ... (Invincibility & Physics 필드는 유지)
+    [Header("넉백 설정")]
+    public float knockbackDuration = 0.2f;
+    public float knockbackResistance = 1f; // 넉백 세기 조절용
 
-    [Header("Respawn & Stun Settings")]
-    public float stunDuration = 2.0f; 
-    private bool isStunned = false; 
+    CharacterController _controller;
+    GameManager gameManager;
+    bool _isKnockback = false;
+    Vector3 _knockbackVelocity;
 
-    // 컴포넌트 참조
-    private MonoBehaviour playerController; 
-    private Animator animator;
-    private Rigidbody rb;
-    private CheckpointManager checkpointManager; // 🚩 매니저 참조 추가
-
-    [Header("Events")]
-    public UnityEvent<int> OnHealthChanged; 
-    public UnityEvent OnDeath;
-
-    [System.Obsolete]
     void Awake()
     {
-        rb = GetComponent<Rigidbody>();
-        // 🚨 본인의 플레이어 컨트롤러 타입으로 변경
-        playerController = GetComponent<ThirdPersonController>(); 
-        animator = GetComponentInChildren<Animator>(); 
-        
-        // 🚩 매니저 찾기
-        checkpointManager = FindObjectOfType<CheckpointManager>();
-        if (checkpointManager == null)
-        {
-            Debug.LogError("씬에 CheckpointManager가 없습니다! 리스폰 시스템이 정상 작동하지 않습니다.");
-        }
-
-        currentHealth = maxHealth;
+        _controller = GetComponent<CharacterController>();
+         gameManager = GameManager.Instance;
     }
 
     void Start()
     {
-        OnHealthChanged?.Invoke(currentHealth);
+        currentHearts = maxHearts;
+        gameManager.UpdateHearts(currentHearts);
     }
 
-    // ... (TakeDamage 함수 유지)
+    void Update()
+    {
+        if (_isKnockback)
+        {
+            _controller.Move(_knockbackVelocity * Time.deltaTime);
+        }
+    }
+
+    public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, float knockbackForce)
+    {
+        if (currentHearts <= 0) return;
+
+        currentHearts -= damage;
+        if (currentHearts < 0) currentHearts = 0;
+
+        gameManager.UpdateHearts(currentHearts);
+
+        if (knockbackForce > 0f)
+        {
+            ApplyKnockback(hitDirection, knockbackForce);
+        }
+
+        if (currentHearts <= 0)
+        {
+            Die();
+        }
+    }
+
+    void ApplyKnockback(Vector3 hitDirection, float force)
+    {
+        // 위로 살짝 + 뒤로 밀리게
+        Vector3 dir = hitDirection.normalized;
+        dir.y = 0f;
+        dir.Normalize();
+
+        _knockbackVelocity = (-dir * force / knockbackResistance) + Vector3.up * 2f;
+        _isKnockback = true;
+        CancelInvoke(nameof(StopKnockback));
+        Invoke(nameof(StopKnockback), knockbackDuration);
+    }
+
+    void StopKnockback()
+    {
+        _isKnockback = false;
+        _knockbackVelocity = Vector3.zero;
+    }
 
     void Die()
     {
-        Debug.Log("플레이어 기절!");
-        OnDeath?.Invoke(); 
-        
-        // 1. 상태 및 컨트롤러 비활성화
-        isStunned = true;
-        if (playerController) playerController.enabled = false;
-        
-        // 2. 물리 정지 및 애니메이션 트리거
-        rb.linearVelocity = Vector3.zero; 
-        rb.angularVelocity = Vector3.zero; 
-        // 🐧 기절 애니메이션 트리거
-        if (animator) animator.SetTrigger("Stun"); 
-
-        // 3. 리스폰 코루틴 시작
-        StartCoroutine(StunAndRespawnRoutine());
+        Debug.Log("플레이어 사망");
+        // TODO: 게임오버 연출, 리스폰 등
     }
-
-    IEnumerator StunAndRespawnRoutine()
-    {
-        // 1. 기절 애니메이션 재생 시간만큼 대기
-        yield return new WaitForSeconds(stunDuration);
-
-        // 2. 리스폰 로직
-        if (checkpointManager != null)
-        {
-            // 🚩 매니저에게 리스폰 위치를 요청하여 이동
-            transform.position = checkpointManager.GetRespawnPosition();
-            Debug.Log("리스폰 성공!");
-        }
-        
-        // 3. 체력 및 상태 초기화
-        currentHealth = maxHealth;
-        OnHealthChanged?.Invoke(currentHealth);
-        
-        rb.linearVelocity = Vector3.zero; // 물리 재설정
-
-        isStunned = false;
-        if (playerController) playerController.enabled = true; // 컨트롤 재활성화
-
-        // 4. 무적 시간 부여
-        // StartCoroutine(InvincibilityRoutine());
-        
-        // 🐧 재시작 후 Idle 애니메이션으로 돌아가도록 설정 (필요시)
-        if (animator) animator.SetTrigger("Respawned"); 
-    }
-
-    public void TakeDamage(int amount, Vector3 hitDirection)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    // ... (InvincibilityRoutine 함수 유지)
-
-    // 인터페이스 구현부 (TakeDamage 등)는 위 단계를 참고하여 기존 코드를 유지하면 됩니다.
 }
