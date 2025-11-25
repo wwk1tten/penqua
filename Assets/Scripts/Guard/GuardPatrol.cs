@@ -513,6 +513,17 @@ public class GuardPatrol : MonoBehaviour
                 StartCoroutine(FallInPuddleCoroutine());
             }
         }
+        else if (other.CompareTag("Player"))
+        {
+            // 인터페이스를 통해 안전하게 접근
+            IDamageable damageable = other.GetComponent<IDamageable>();
+            
+            if (damageable != null)
+            {
+                // 데미지 1을 주고, 내 위치(transform.position)를 전달하여 넉백 방향 계산
+                damageable.TakeDamage(1, transform.position);
+            }
+        }
     }
     private void OnTriggerStay(Collider other)
     {

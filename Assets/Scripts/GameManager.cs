@@ -5,14 +5,13 @@ using TMPro;
 
 public class GameManager : MonoBehaviour
 {
-    // 싱글톤 패턴: 어디서든 GameManager.Instance로 접근 가능
     public static GameManager Instance { get; private set; }
-
-    // 수집된 캡슐의 ID를 저장할 Set (중복 방지)
-    public HashSet<string> collectedCapsuleIDs = new HashSet<string>();
+    public HashSet<string> collectedCapsuleIDs = new HashSet<string>(); // 수집된 캡슐의 ID를 저장할 Set (중복 방지)
     
-    // UI (선택 사항)
-    public TMP_Text capsuleCountText;
+    public TMP_Text capsuleCountText; // 캡슐 카운트
+    public Image[] hearts; // 인스펙터에서 하트 이미지 3개 연결
+    public Sprite fullHeart;
+    public Sprite emptyHeart; // 비어있는 하트 이미지 (선택 사항)
 
     void Awake()
     {
@@ -52,6 +51,20 @@ public class GameManager : MonoBehaviour
         if (capsuleCountText != null)
         {
             capsuleCountText.text = $"{collectedCapsuleIDs.Count} / 3 remaining";
+        }
+    }
+    public void UpdateHearts(int currentHealth)
+    {
+        for (int i = 0; i < hearts.Length; i++)
+        {
+            if (i < currentHealth)
+            {
+                hearts[i].enabled = true; // 혹은 hearts[i].sprite = fullHeart;
+            }
+            else
+            {
+                hearts[i].enabled = false; // 혹은 hearts[i].sprite = emptyHeart;
+            }
         }
     }
 }
