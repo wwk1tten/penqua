@@ -55,15 +55,25 @@ public class GameManager : MonoBehaviour
     }
     public void UpdateHearts(int currentHealth)
     {
+        // 방어 코드: 체력이 음수면 0으로 처리
+        if (currentHealth < 0) currentHealth = 0;
+        // 방어 코드: 체력이 최대 하트 개수보다 많으면 그에 맞춤
+        if (currentHealth > hearts.Length) currentHealth = hearts.Length;
+
         for (int i = 0; i < hearts.Length; i++)
         {
+            // 1. 하트 이미지가 보이도록 켭니다. (방법1을 쓰다가 넘어왔을 때 꺼져있을 수 있음)
+            hearts[i].enabled = true;
+
             if (i < currentHealth)
             {
-                hearts[i].enabled = true; // 혹은 hearts[i].sprite = fullHeart;
+                // 현재 체력보다 작으면 -> 꽉 찬 하트
+                hearts[i].sprite = fullHeart;
             }
             else
             {
-                hearts[i].enabled = false; // 혹은 hearts[i].sprite = emptyHeart;
+                // 현재 체력보다 크거나 같으면 -> 빈 하트
+                hearts[i].sprite = emptyHeart;
             }
         }
     }

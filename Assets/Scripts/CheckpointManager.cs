@@ -1,40 +1,49 @@
+using System;
 using UnityEngine;
 
-public class CheckpointManager : MonoBehaviour
+public class CheckPointManager : MonoBehaviour
 {
-    // 씬 시작 시 플레이어가 리스폰할 초기 위치를 저장합니다.
-    private Vector3 initialRespawnPosition;
-    
-    // 플레이어가 마지막으로 활성화한 체크포인트 위치를 저장합니다.
+    public Transform initialSpawnPoint; 
     private Vector3 lastCheckpointPosition;
+    public static CheckPointManager Instance { get; private set; }
 
     void Awake()
     {
-        // 🚨 중요: 씬 시작 시 플레이어가 있어야 할 초기 위치를 설정하세요.
-        // 예를 들어, 씬에 'InitialSpawnPoint'라는 GameObject를 두고 그 위치를 사용하거나, 
-        // 플레이어의 시작 위치를 그대로 사용합니다.
-        
-        // 현재는 이 스크립트가 부착된 오브젝트의 위치를 초기 위치로 설정하겠습니다.
-        initialRespawnPosition = transform.position; 
-        lastCheckpointPosition = initialRespawnPosition;
+        // 싱글톤 초기화 로직
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject); // 이미 매니저가 있으면 나 자신을 파괴 (중복 방지)
+            return;
+        }
+        Instance = this;
+        // 씬이 넘어가도 파괴되지 않게 하려면 아래 줄 주석 해제
+        // DontDestroyOnLoad(gameObject);
+
+        // ... 기존 초기화 로직 ...
+        if (initialSpawnPoint != null)
+        {
+            lastCheckpointPosition = initialSpawnPoint.position;
+        }
+        else
+        {
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if(player) lastCheckpointPosition = player.transform.position;
+        }
     }
 
-    /// <summary>
-    /// 플레이어가 새로운 체크포인트를 통과할 때 이 함수를 호출합니다.
-    /// </summary>
-    /// <param name="newPosition">새로운 체크포인트의 월드 위치</param>
     public void UpdateCheckpoint(Vector3 newPosition)
     {
         lastCheckpointPosition = newPosition;
-        Debug.Log($"새로운 체크포인트 설정됨: {lastCheckpointPosition}");
+        Debug.Log($"체크포인트 저장 완료: {lastCheckpointPosition}");
     }
 
-    /// <summary>
-    /// 플레이어가 사망했을 때 현재 리스폰 위치를 반환합니다.
-    /// </summary>
-    /// <returns>마지막으로 기록된 체크포인트 위치</returns>
     public Vector3 GetRespawnPosition()
     {
         return lastCheckpointPosition;
+    }
+
+    public static implicit operator CheckPointManager(CheckPointObject v)
+    {
+        throw new NotImplementedException();
     }
 }

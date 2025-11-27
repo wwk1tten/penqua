@@ -63,10 +63,11 @@ public class GuardPatrol : MonoBehaviour
     private bool isFalling = false; // 넘어지는 중
     [Header("Attack")]
     public float attackRange = 1.5f; // 공격이 가능한 거리
-    public int attackDamage = 10;   // 공격 당 피해량
-    public float attackCooldown = 2f; // 공격 간의 쿨타임 (2초에 한 번)
+    public int attackDamage = 1;   // 공격 당 피해량
+    public float attackCooldown = 1.5f; // 공격 간의 쿨타임 (2초에 한 번)
     private float _nextAttackTime = 0f;
-    public float knockbackForce = 8f;
+    public float knockbackForce = 5f;
+    private float lastAttackTime = -999f;
 
     // 기본 속도 저장
     private float basePatrolSpeed;
@@ -99,6 +100,20 @@ public class GuardPatrol : MonoBehaviour
         {
             alertUI.SetActive(false);
         }
+
+        if (playerTarget == null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            
+            if (playerObj != null)
+            {
+                playerTarget = playerObj.transform;
+            }
+            else
+            {
+                Debug.LogError("경비원: 플레이어를 찾을 수 없습니다! Player 태그를 확인하세요.");
+            }
+        }
         
         if (waypoints.Length == 0)
         {
@@ -127,7 +142,7 @@ public class GuardPatrol : MonoBehaviour
     }
 
     void Update(){
-        // 넘어지는 중이면 아무것도 안 함
+        if (playerTarget == null) return;
         if (isFalling) return;
 
         // 젖음 회복 (시간이 지나면서 감소)
@@ -135,6 +150,18 @@ public class GuardPatrol : MonoBehaviour
         {
             currentWetness -= wetnessDecayRate * Time.deltaTime;
             currentWetness = Mathf.Max(0, currentWetness);
+        }
+
+        float distanceToPlayer = Vector3.Distance(transform.position, playerTarget.position);
+
+        // 공격 범위 안에 있고 + 쿨타임이 지났다면
+        if (distanceToPlayer <= attackRange)
+        {
+            // Time.time이 (마지막공격시간 + 쿨타임)보다 크면 공격 가능
+            if (Time.time >= lastAttackTime + attackCooldown)
+            {
+                AttackPlayer();
+            }
         }
         
         // 젖음에 따라 속도, 시각화 조정
@@ -476,8 +503,6 @@ public class GuardPatrol : MonoBehaviour
             ChangeState(GuardState.Suspicious);
         }
     }
-
-
     /// <summary>
     /// 젖음 수치에 따라 속도 감소
     /// </summary>
@@ -558,6 +583,11 @@ public class GuardPatrol : MonoBehaviour
                 StartCoroutine(FallInPuddleCoroutine());
             }
         }
+
+        else if (other.TryGetComponent<IDamageable>(out IDamageable target))
+        {
+            target.TakeDamage(1); // 데미지 1 주기
+        }
     }
     private void OnTriggerStay(Collider other)
     {
@@ -600,26 +630,22 @@ public class GuardPatrol : MonoBehaviour
 
     private void AttackPlayer()
     {
-        _nextAttackTime = Time.time + attackCooldown;
+        // 1. 공격 시간 갱신 (이제부터 쿨타임 시작)
+        lastAttackTime = Time.time;
 
-        // 애니메이션 트리거 (있으면)
-        if (animator != null)
-            animator.SetTrigger("Attack");
+        // 2. 애니메이션
+        if (animator != null) animator.SetTrigger("Attack");
 
-        // 방향 계산 (경비원 -> 플레이어)
-        Vector3 dir = playerTarget.position - transform.position;
-        dir.y = 0f;
-        dir.Normalize();
+        // 3. 방향 계산
+        Vector3 dir = (playerTarget.position - transform.position).normalized;
+        dir.y = 0;
 
-        // 플레이어에 IDamageable 있으면 호출
+        // 4. 데미지 주기
         if (playerTarget.TryGetComponent<IDamageable>(out var dmg))
         {
-            Debug.Log("Guard 공격 성공, TakeDamage 호출");
+            // 🌟 공격 성공 로그
+            Debug.Log("공격 성공"); 
             dmg.TakeDamage(attackDamage, playerTarget.position, dir, knockbackForce);
-        }
-        else
-        {
-            Debug.LogWarning("Player에 IDamageable 구현이 없음");
         }
     }
 
