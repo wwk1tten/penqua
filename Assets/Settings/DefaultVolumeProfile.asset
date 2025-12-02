@@ -252,6 +252,32 @@ MonoBehaviour:
   m_Name: VolumeComponentSupportedEverywhere
   m_EditorClassIdentifier: Unity.RenderPipelines.Core.Editor.Tests:UnityEngine.Rendering.Tests:VolumeComponentEditorSupportedOnTests/VolumeComponentSupportedEverywhere
   active: 1
+--- !u!114 &-5183037023867263279
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6de40c3d47391a4e89d129fbf4136c1, type: 3}
+  m_Name: TemporalAntiAliasing
+  m_EditorClassIdentifier: TAA.Runtime::Naiwen.TAA.TemporalAntiAliasing
+  active: 1
+  <displayName>k__BackingField: 
+  quality:
+    <fieldHash>k__BackingField: 2063418352
+    m_OverrideState: 1
+    m_Value: 0
+  spread:
+    <fieldHash>k__BackingField: -1992198552
+    m_OverrideState: 1
+    m_Value: 1
+  feedback:
+    <fieldHash>k__BackingField: -1513497768
+    m_OverrideState: 1
+    m_Value: 0
 --- !u!114 &-5139089513906902183
 MonoBehaviour:
   m_ObjectHideFlags: 3

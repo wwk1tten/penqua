@@ -7,6 +7,10 @@ public class WaterGunController : MonoBehaviour
     [Header("카메라 & 총구")]
     public Camera mainCamera;
     public Transform gunMuzzle;
+    [Header("무기 장착")]
+    public bool hasWeapon = false;      // 무기 획득 여부
+    public GameObject handGunModel;     // 손에 있는 물총 모델 (RightHand 자식)
+    public GameObject backGunModel;     // 등에 있는 물총 모델 (Spine 자식)
 
     [Header("발사 설정")]
     public float shootRange = 50f;
@@ -50,6 +54,18 @@ public class WaterGunController : MonoBehaviour
 
     void Start()
     {
+        if (!hasWeapon)
+        {
+            if(handGunModel) handGunModel.SetActive(false);
+            if(backGunModel) backGunModel.SetActive(false);
+        }
+        else 
+        {
+            // 이미 있다면 등에 멘 상태로 시작
+            if(handGunModel) handGunModel.SetActive(false);
+            if(backGunModel) backGunModel.SetActive(true);
+        }
+
         mainCamera = mainCamera ?? Camera.main;
         currentWater = maxWater;
 
@@ -68,43 +84,40 @@ public class WaterGunController : MonoBehaviour
 
     void Update()
     {
-        // 재장전 중일 때는 모든 행동을 막습니다.
+        // [신규] 무기가 없으면 아무 로직도 실행하지 않음
+        if (!hasWeapon) return;
+
+        // [신규] 무기 모델 교체 로직 (조준 여부에 따라)
+        HandleWeaponModel();
+
+        // 재장전 중일 때는 모든 행동 막음
         if (isReloading) return;
 
-         // 'R'키를 누르고, 물 근처에 있으며, 물이 가득 차지 않았을 때 재장전 시작
+        // 재장전 시도
         if (Input.GetKeyDown(KeyCode.R) && isNearWaterSource && currentWater < maxWater)
         {
             StartCoroutine(Reload());
-            return; // 재장전을 시작하면 다른 행동은 하지 않음
+            return; 
         }
 
-        // 마우스 좌클릭을 누르고 있으면 연속 발사
-        if (Input.GetMouseButton(0) && currentWater > 0)
+        // [변경] 발사 조건: 우클릭(조준) 중일 때 + 좌클릭 시에만 발사되도록 변경
+        // (만약 '지향사격'을 허용하려면 Input.GetMouseButton(1) 조건을 빼세요)
+        if (Input.GetMouseButton(1) && Input.GetMouseButton(0) && currentWater > 0)
         {
-            // 1. 물 소모
             currentWater -= waterConsumptionRate * Time.deltaTime;
 
-            // 2. 발사 속도에 맞춰 Shoot() 함수 호출
             if (Time.time >= nextFireTime)
             {
                 nextFireTime = Time.time + 1f / fireRate;
                 Shoot();
             }
 
-            // 3. 물줄기 파티클 재생
             if (waterStreamEffect != null)
             {
-                // 파티클이 재생 중이 아니면 재생 시작
-                if (!waterStreamEffect.isPlaying)
-                {
-                    waterStreamEffect.Play();
-                }
-                
-                // 파티클 방향을 조준점에 맞춤
+                if (!waterStreamEffect.isPlaying) waterStreamEffect.Play();
                 AdjustParticleDirection();
             }
 
-            // + 물웅덩이는 더 자주 체크하여 생성
             if (Time.time >= nextPuddleTime)
             {
                 nextPuddleTime = Time.time + puddleSpawnInterval;
@@ -113,15 +126,40 @@ public class WaterGunController : MonoBehaviour
         }
         else
         {
-            // 4. 물줄기 파티클 정지
             if (waterStreamEffect != null && waterStreamEffect.isPlaying)
             {
                 waterStreamEffect.Stop();
             }
         }
 
-        // 물탱크 용량 제한
         currentWater = Mathf.Clamp(currentWater, 0, maxWater);
+    }
+
+    
+
+    void HandleWeaponModel()
+    {
+        // 우클릭 중인지 확인 (StarterAssets라면 _input.aim 사용)
+        bool isAiming = Input.GetMouseButton(1); 
+
+        if (isAiming)
+        {
+            // 조준 중 -> 손에 든 모델 ON, 등에 멘 모델 OFF
+            if(handGunModel && !handGunModel.activeSelf) handGunModel.SetActive(true);
+            if(backGunModel && backGunModel.activeSelf) backGunModel.SetActive(false);
+        }
+        else
+        {
+            // 평상시 -> 손에 든 모델 OFF, 등에 멘 모델 ON
+            if(handGunModel && handGunModel.activeSelf) handGunModel.SetActive(false);
+            if(backGunModel && !backGunModel.activeSelf) backGunModel.SetActive(true);
+            
+            // 조준을 풀면 파티클도 즉시 꺼야 함
+            if (waterStreamEffect != null && waterStreamEffect.isPlaying)
+            {
+                waterStreamEffect.Stop();
+            }
+        }
     }
 
     void Shoot()
@@ -239,6 +277,16 @@ public class WaterGunController : MonoBehaviour
         Destroy(navObstacle, puddleDuration); 
 
         return true;
+    }
+
+    public void PickupWaterGun()  // 외부에서 호출할 무기 획득 함수
+    {
+        hasWeapon = true;
+        Debug.Log("물총을 획득했습니다!");
+        
+        // 획득 즉시 등에 멘 모습 보여주기
+        if(backGunModel) backGunModel.SetActive(true);
+        if(handGunModel) handGunModel.SetActive(false);
     }
 
     IEnumerator Reload()
