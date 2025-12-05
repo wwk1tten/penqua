@@ -8,6 +8,7 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
     public HashSet<string> collectedCapsuleIDs = new HashSet<string>(); // 수집된 캡슐의 ID를 저장할 Set (중복 방지)
     
+    public int totalCapsulesToCollect = 3; 
     public TMP_Text capsuleCountText; // 캡슐 카운트
     public Image[] hearts; // 인스펙터에서 하트 이미지 3개 연결
     public Sprite fullHeart;
@@ -53,6 +54,11 @@ public class GameManager : MonoBehaviour
             capsuleCountText.text = $"{collectedCapsuleIDs.Count} / 3 remaining";
         }
     }
+
+    public void GameClear(){
+        
+    }
+
     public void UpdateHearts(int currentHealth)
     {
         // 방어 코드: 체력이 음수면 0으로 처리

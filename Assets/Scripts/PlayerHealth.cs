@@ -116,7 +116,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (movementScript != null) movementScript.enabled = true;
     }
 
-private void Die()
+    private void Die()
     {
         Debug.Log("플레이어 기절!");
         
@@ -126,10 +126,10 @@ private void Die()
 
         isStunned = true;
         
-        // 2. 움직임 끄기 (잘 하셨습니다. 사망 시 입력을 막아야 하니까요)
+        // 2. 움직임 끄기 
         if (movementScript != null) movementScript.enabled = false;
 
-        // 3. 물리 충돌 문제 방지를 위해 CharacterController도 잠시 끄는 것이 좋습니다.
+        // 3. 물리 충돌 문제 방지
         if (charController != null) charController.enabled = false;
 
         StartCoroutine(RespawnRoutine());

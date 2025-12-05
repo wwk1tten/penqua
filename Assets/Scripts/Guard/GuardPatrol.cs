@@ -23,7 +23,6 @@ public class GuardPatrol : MonoBehaviour
 
     [Header("Alert Settings")]
     public float alertSpeed = 2f;
-    public GameObject alertUI; 
 
     [Header("Detection")]
     public float visionRange = 15f; // Gizmo용
@@ -46,6 +45,7 @@ public class GuardPatrol : MonoBehaviour
     private NavMeshAgent agent;
     private AISensor sensor;
     private Animator animator;
+    private GuardIcon guardIcon;
     private Transform playerTarget = null;
     
     private int currentWaypointIndex = 0;
@@ -76,6 +76,7 @@ public class GuardPatrol : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         sensor = GetComponent<AISensor>();
         animator = GetComponent<Animator>();
+        guardIcon = GetComponent<GuardIcon>();
 
         // 속도 백업
         basePatrolSpeed = patrolSpeed;
@@ -89,7 +90,7 @@ public class GuardPatrol : MonoBehaviour
         _animIDAttack = Animator.StringToHash("Attack");
 
         agent.speed = patrolSpeed;
-        if (alertUI != null) alertUI.SetActive(false);
+        guardIcon.SetAlert(false);
 
         // 플레이어 찾기
         if (playerTarget == null)
@@ -212,8 +213,6 @@ public class GuardPatrol : MonoBehaviour
 
     void UpdatePatrol()
     {
-        if (alertUI != null) alertUI.SetActive(false);
-
         if (isWaiting)
         {
             waitTimer -= Time.deltaTime;
@@ -235,7 +234,8 @@ public class GuardPatrol : MonoBehaviour
 
     void UpdateAlert()
     {
-        if (alertUI != null) alertUI.SetActive(true);
+        guardIcon.SetAlert(true);
+
         if (playerTarget != null) agent.destination = playerTarget.position;
 
         alertTimer -= Time.deltaTime;
@@ -247,7 +247,7 @@ public class GuardPatrol : MonoBehaviour
 
     void UpdateChase()
     {
-        if (alertUI != null) alertUI.SetActive(true);
+        guardIcon.SetAlert(true);
 
         if (playerTarget == null)
         {
@@ -293,7 +293,7 @@ public class GuardPatrol : MonoBehaviour
 
     void UpdateSuspicious()
     {
-        if (alertUI != null) alertUI.SetActive(true);
+        guardIcon.SetAlert(true);
         if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
         {
             ChangeState(GuardState.Return);
@@ -302,7 +302,7 @@ public class GuardPatrol : MonoBehaviour
 
     void UpdateReturn()
     {
-        if (alertUI != null) alertUI.SetActive(false);
+        guardIcon.SetAlert(false);
         if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
         {
             ChangeState(GuardState.Patrol);
