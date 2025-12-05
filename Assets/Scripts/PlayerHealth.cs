@@ -23,8 +23,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public MonoBehaviour movementScript;
     private CharacterController charController; // Rigidbody 대신 이거 사용
     
-    // 🚨 중요: 빙글 도는 거 막기 위해 움직임 스크립트를 가져옵니다.
-    // 만약 스크립트 이름이 ThirdPersonController가 아니라면 그 이름으로 바꾸세요!
     private Animator animator;
     private CheckPointManager checkpointManager;
 

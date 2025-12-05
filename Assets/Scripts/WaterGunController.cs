@@ -196,6 +196,7 @@ public class WaterGunController : MonoBehaviour
                 {
                     audioSource.PlayOneShot(guardHitSound); 
                 }
+                SoundEmitter.MakeSound(transform.position, 5f);
             }
         }
     }
@@ -248,6 +249,7 @@ public class WaterGunController : MonoBehaviour
                         {
                             audioSource.PlayOneShot(puddleSplashSound); 
                         }
+                        SoundEmitter.MakeSound(transform.position, 5f);
 
                         CreateWaterPuddle(hit.point, hit.normal);
                         lastPuddlePosition = hit.point;  
@@ -304,6 +306,7 @@ public class WaterGunController : MonoBehaviour
         {
             audioSource.PlayOneShot(reloadSound); 
         }
+        SoundEmitter.MakeSound(transform.position, 5f);
 
         yield return new WaitForSeconds(reloadTime); // reloadTime 만큼 대기
         

@@ -39,10 +39,13 @@ public class AISensor : MonoBehaviour
     void Update()
     {
         scanTimer -= Time.deltaTime;
-        if (scanTimer < 0) 
-        {
+        if (scanTimer < 0) {
             scanTimer += scanInterval;
             Scan();
+        }
+
+        if (Application.isEditor && !Application.isPlaying) {
+             // 에디터 모드일 때만 실시간 갱신
         }
     }
 
@@ -67,7 +70,7 @@ public class AISensor : MonoBehaviour
         Vector3 dest = obj.transform.position + Vector3.up * (height / 2f);
         Vector3 direction = dest - origin;
         
-        // 1. 높이 체크 (수정됨!)
+        // 1. 높이 체크
         float heightDiff = Mathf.Abs(direction.y);
         if (heightDiff > height / 2f) 
         {
@@ -77,22 +80,16 @@ public class AISensor : MonoBehaviour
         // 2. 각도 체크
         Vector3 flatDirection = new Vector3(direction.x, 0, direction.z).normalized;
         float deltaAngle = Vector3.Angle(flatDirection, transform.forward);
-        if (deltaAngle > angle) 
-        {
-            return false;
-        }
+        
+        if (deltaAngle > angle / 2f) return false;
 
-        // 3. 장애물 체크 (수정됨!)
-        if(Physics.Linecast(origin, dest, occlusionLayers)) 
-        {
-            return false;
-        }
+        // 3. 장애물 체크
+        if(Physics.Linecast(origin, dest, occlusionLayers)) return false;
         
         return true;
     }
 
-    Mesh CreateWedgeMesh()
-    {
+    Mesh CreateWedgeMesh(){
         Mesh newMesh = new Mesh();
 
         int segments = 10;
@@ -107,7 +104,7 @@ public class AISensor : MonoBehaviour
 
         int vert = 0;
         
-        float halfAngle = angle / 2f;
+        float currentAngle = -angle / 2f; 
         float deltaAngle = angle / segments;
         
         // 모든 segment의 포인트 저장
@@ -116,8 +113,7 @@ public class AISensor : MonoBehaviour
         
         for(int i = 0; i <= segments; ++i)
         {
-            float currentAngle = -halfAngle + (deltaAngle * i);
-            Vector3 direction = Quaternion.Euler(0, currentAngle, 0) * Vector3.forward;
+            Vector3 direction = Quaternion.Euler(0, currentAngle + (deltaAngle * i), 0) * Vector3.forward;            
             
             bottomPoints[i] = direction * distance;
             topPoints[i] = bottomPoints[i] + Vector3.up * height;
@@ -189,23 +185,20 @@ public class AISensor : MonoBehaviour
     {
         mesh = CreateWedgeMesh();
         scanInterval = 1.0f / scanFrequency;
+        
+        // 에디터에서 값 바꿀 때 바로 반영
+        if (GetComponent<MeshFilter>() != null)
+            GetComponent<MeshFilter>().sharedMesh = mesh;
+            
+        //UpdateMeshMaterial();
     }
 
     private void OnDrawGizmos() 
     {
-        if(mesh != null) 
-        {
-            Gizmos.color = meshColor;
-            Gizmos.DrawMesh(mesh, transform.position, transform.rotation);
-        }
-
         Gizmos.color = Color.green;
         foreach (var obj in Objects) 
         {
-            if (obj != null)
-            {
-                Gizmos.DrawSphere(obj.transform.position, 0.2f);
-            }
+            if (obj != null) Gizmos.DrawSphere(obj.transform.position, 0.2f);
         } 
     }
     

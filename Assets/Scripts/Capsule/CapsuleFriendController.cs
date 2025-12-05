@@ -109,7 +109,6 @@ public class CapsuleFriendController : MonoBehaviour
         currentState = AnimalState.WalkingOnLand;
         
         rb.isKinematic = true; // 물리 효과 정지
-        GetComponent<WateverVolumeFloater>().enabled = false; // 물에 뜨는 기능 정지
         agent.enabled = true; // NavMeshAgent 활성화!
 
         agent.stoppingDistance = 0; // 지정석에 정확히 도착해야 하므로 0으로 설정

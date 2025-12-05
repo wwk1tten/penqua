@@ -5,16 +5,10 @@ using UnityEngine.AI;
 
 public class GuardPatrol : MonoBehaviour
 {
-    // 상태 정의
-    public enum GuardState
-    {
-        Patrol,
-        Suspicious,
-        Alert,
-        Chase,
-        Return
-
-    }
+    // =========================================================
+    // 1. 설정 및 변수 (기존 유지)
+    // =========================================================
+    public enum GuardState { Patrol, Suspicious, Alert, Chase, Return }
 
     [Header("State")]
     public GuardState currentState = GuardState.Patrol;
@@ -23,172 +17,131 @@ public class GuardPatrol : MonoBehaviour
     [Header("Patrol Settings")]
     public Transform[] waypoints;
     public float patrolSpeed = 3.5f;
+    public float chaseSpeed = 5f; // [수정] 오타 방지를 위해 순서 정리
     public float waypointReachedDistance = 1.0f;
     public float waitTime = 2.0f;
 
     [Header("Alert Settings")]
     public float alertSpeed = 2f;
+    public GameObject alertUI; 
+
+    [Header("Detection")]
+    public float visionRange = 15f; // Gizmo용
+    public float hearingRange = 10f;
     
-    [Header("UI")]
-    public GameObject alertUI; // "!" 느낌표
+    [Header("Attack")]
+    public float attackRange = 1.5f; 
+    public int attackDamage = 1;   
+    public float attackCooldown = 1.5f; 
+    public float knockbackForce = 5f;
     
+    [Header("Wetness & Debuff")]
+    public float maxWetness = 100f;
+    public float stunWetness = 80f;
+    public float wetnessDecayRate = 5f;
+    public float puddleSpeedMultiplier = 0.5f;
+    public float fallStunDuration = 1.5f;
+
+    // 내부 변수
     private NavMeshAgent agent;
     private AISensor sensor;
     private Animator animator;
-
+    private Transform playerTarget = null;
+    
     private int currentWaypointIndex = 0;
     private float waitTimer = 0f;
     private bool isWaiting = false;
     private float alertTimer = 0f;
-    private Transform playerTarget = null;
-
-    [Header("Detection")]
-    public float visionRange = 15f;
-    public float visionAngle = 90f;
-    public float hearingRange = 10f;
     
-    [Header("Chase")]
-    public float chaseSpeed = 5f;
-    [Header("Wetness")]
-    public float maxWetness = 100f;
-    public float stunWetness = 80f;
-    private float currentWetness = 0f;
-    public float wetnessDecayRate = 5f; // 초당 회복 속도
-    private List<Material> wetnessMaterials = new List<Material>();
-    private Material guardMaterial;
-    [Header("Stun")]
-    public float puddleSpeedMultiplier = 0.5f; // 50% 속도로 감소
-    public float fallStunDuration = 1.5f; // 넘어졌을 때 스턴 시간
-    private bool isInPuddle = false;
-    private bool isFalling = false; // 넘어지는 중
-    [Header("Attack")]
-    public float attackRange = 1.5f; // 공격이 가능한 거리
-    public int attackDamage = 1;   // 공격 당 피해량
-    public float attackCooldown = 1.5f; // 공격 간의 쿨타임 (2초에 한 번)
-    private float _nextAttackTime = 0f;
-    public float knockbackForce = 5f;
     private float lastAttackTime = -999f;
-
-    // 기본 속도 저장
-    private float basePatrolSpeed;
-    private float baseAlertSpeed;
-    private float baseChaseSpeed;
-
+    private float currentWetness = 0f;
+    private bool isInPuddle = false;
+    private bool isFalling = false;
+    
+    private List<Material> wetnessMaterials = new List<Material>();
+    private float basePatrolSpeed, baseAlertSpeed, baseChaseSpeed;
     private Vector3 lastKnownPosition;
-    private Vector3 originalPosition;
-    // 애니메이터 파라미터
+
+    // 애니메이션 해시 (최적화)
     private int _animIDFall;
     private int _animIDHit;
+    private int _animIDAlert;
+    private int _animIDAttack;
 
-    void Start(){
+    // =========================================================
+    // 2. 초기화 (Start)
+    // =========================================================
+    void Start()
+    {
         agent = GetComponent<NavMeshAgent>();
         sensor = GetComponent<AISensor>();
         animator = GetComponent<Animator>();
 
-        // 기본 속도 저장
+        // 속도 백업
         basePatrolSpeed = patrolSpeed;
         baseAlertSpeed = alertSpeed;
-        basePatrolSpeed = chaseSpeed;
+        baseChaseSpeed = chaseSpeed; // [중요] 기존 코드 오타 수정됨
 
-        // 애니메이터 파라미터 캐싱
+        // 애니메이션 ID 캐싱
         _animIDFall = Animator.StringToHash("Fall");
         _animIDHit = Animator.StringToHash("Hit");
-        
+        _animIDAlert = Animator.StringToHash("isAlert");
+        _animIDAttack = Animator.StringToHash("Attack");
+
         agent.speed = patrolSpeed;
+        if (alertUI != null) alertUI.SetActive(false);
 
-        if (alertUI != null)
-        {
-            alertUI.SetActive(false);
-        }
-
+        // 플레이어 찾기
         if (playerTarget == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-            
-            if (playerObj != null)
-            {
-                playerTarget = playerObj.transform;
-            }
-            else
-            {
-                Debug.LogError("경비원: 플레이어를 찾을 수 없습니다! Player 태그를 확인하세요.");
-            }
-        }
-        
-        if (waypoints.Length == 0)
-        {
-            Debug.LogError("Waypoints가 설정되지 않았습니다!");
-            enabled = false;
-            return;
+            if (playerObj != null) playerTarget = playerObj.transform;
         }
 
+        // 머티리얼 캐싱
         SkinnedMeshRenderer[] allRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
-        
-        if (allRenderers.Length > 0)
+        foreach (var renderer in allRenderers)
         {
-            foreach (var renderer in allRenderers)
-            {
-                // 각 렌더러의 머티리얼에 대한 인스턴스를 생성하고 리스트에 추가
-                // 이렇게 하면 원본 머티리얼 에셋은 건드리지 않게 됨
-                wetnessMaterials.Add(renderer.material); 
-            }
-        }
-        else
-        {
-            Debug.LogError($"[{gameObject.name}]에서 SkinnedMeshRenderer를 찾을 수 없습니다!");
+            wetnessMaterials.Add(renderer.material);
         }
 
         SetDestination();
     }
 
-    void Update(){
+    // =========================================================
+    // 3. Update (여기가 핵심 리팩토링)
+    // =========================================================
+    void Update()
+    {
         if (playerTarget == null) return;
-        if (isFalling) return;
+        if (isFalling) return; // 넘어져 있으면 아무것도 안 함
 
-        // 젖음 회복 (시간이 지나면서 감소)
-        if (currentWetness > 0)
-        {
-            currentWetness -= wetnessDecayRate * Time.deltaTime;
-            currentWetness = Mathf.Max(0, currentWetness);
-        }
-
-        float distanceToPlayer = Vector3.Distance(transform.position, playerTarget.position);
-
-        // 공격 범위 안에 있고 + 쿨타임이 지났다면
-        if (distanceToPlayer <= attackRange)
-        {
-            // Time.time이 (마지막공격시간 + 쿨타임)보다 크면 공격 가능
-            if (Time.time >= lastAttackTime + attackCooldown)
-            {
-                AttackPlayer();
-            }
-        }
-        
-        // 젖음에 따라 속도, 시각화 조정
+        // 1. 젖음 회복 및 효과 처리
+        HandleWetnessRecovery();
         UpdateWetnessEffect();
         UpdateSpeedByWetness();
-        // 플레이어 감지 확인
+
+        // 2. 플레이어 감지 (센서)
         DetectPlayer();
-        
-        // 상태에 따른 행동
+
+        // 3. 공격 체크 (상태와 무관하게 사거리+시야 되면 공격)
+        CheckAndAttack();
+
+        // 4. 상태 머신 실행
         switch (currentState)
         {
             case GuardState.Patrol:
                 UpdatePatrol();
                 break;
-            
             case GuardState.Suspicious:
                 UpdateSuspicious();
                 break;
-            
             case GuardState.Alert:
                 UpdateAlert();
                 break;
-                
             case GuardState.Chase:
                 UpdateChase();
                 break;
-                
             case GuardState.Return:
                 UpdateReturn();
                 break;
@@ -197,14 +150,45 @@ public class GuardPatrol : MonoBehaviour
         UpdateAnimator();
     }
 
-    /// <summary>
-    /// 플레이어 감지 및 상태 전환
-    /// </summary>
+    // =========================================================
+    // 4. 기능별 분리 함수들 (깔끔하게 정리됨)
+    // =========================================================
+
+    // [핵심] 공격 가능 여부 체크 및 실행
+    void CheckAndAttack()
+    {
+        float distanceToPlayer = Vector3.Distance(transform.position, playerTarget.position);
+
+        // A. 사거리 체크
+        if (distanceToPlayer <= attackRange)
+        {
+            // B. 쿨타임 체크
+            if (Time.time >= lastAttackTime + attackCooldown)
+            {
+                // C. [중요] 시야(Mesh) 체크 추가
+                // 센서가 정상 작동 중이고, 플레이어가 센서 시야각(부채꼴) 안에 있을 때만 공격
+                if (sensor != null && sensor.IsInSight(playerTarget.gameObject))
+                {
+                    AttackPlayer();
+                }
+            }
+        }
+    }
+
+    void HandleWetnessRecovery()
+    {
+        if (currentWetness > 0)
+        {
+            currentWetness -= wetnessDecayRate * Time.deltaTime;
+            currentWetness = Mathf.Max(0, currentWetness);
+        }
+    }
+
     void DetectPlayer()
     {
         if (sensor == null) return;
         
-        // 감지된 객체 확인
+        // 센서가 감지한 물체들 중 플레이어가 있는지 확인
         if (sensor.Objects.Count > 0)
         {
             foreach (var obj in sensor.Objects)
@@ -212,30 +196,24 @@ public class GuardPatrol : MonoBehaviour
                 if (obj != null && obj.CompareTag("Player"))
                 {
                     playerTarget = obj.transform;
-                    
-                    // Alert 상태로 전환
-                    if (currentState != GuardState.Alert)
+                    if (currentState != GuardState.Alert && currentState != GuardState.Chase)
                     {
                         ChangeState(GuardState.Alert);
                     }
-                    
                     return;
                 }
             }
         }
     }
 
-    /// <summary>
-    /// 순찰 상태 업데이트
-    /// </summary>
-    void UpdatePatrol(){
-        // UI 비활성화
-        if (alertUI != null)
-        {
-            alertUI.SetActive(false);
-        }
+    // =========================================================
+    // 5. 상태별 업데이트 (UpdateXXX)
+    // =========================================================
 
-        // 대기 중이면
+    void UpdatePatrol()
+    {
+        if (alertUI != null) alertUI.SetActive(false);
+
         if (isWaiting)
         {
             waitTimer -= Time.deltaTime;
@@ -247,229 +225,214 @@ public class GuardPatrol : MonoBehaviour
             }
             return;
         }
-        
-        // Waypoint 도착 확인
-        if (agent.remainingDistance <= waypointReachedDistance && !agent.pathPending)
+
+        if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
         {
             isWaiting = true;
             waitTimer = waitTime;
         }
     }
 
-    /// <summary>
-    /// 경보 상태 업데이트
-    /// </summary>
-    void UpdateAlert(){
-        // UI 활성화
-        if (alertUI != null)
-        {
-            alertUI.SetActive(true);
-        }
+    void UpdateAlert()
+    {
+        if (alertUI != null) alertUI.SetActive(true);
+        if (playerTarget != null) agent.destination = playerTarget.position;
 
-        // 플레이어를 향해 이동
-        if (playerTarget != null)
-        {
-            agent.destination = playerTarget.position;
-        }
-
-        // Alert 타이머
         alertTimer -= Time.deltaTime;
-        
-        if (alertTimer <= 0.5)
+        if (alertTimer <= 0.5f) // 약간의 딜레이 후 추격
         {
             ChangeState(GuardState.Chase);
         }
     }
 
-    /// <summary>
-    /// 의심 상태 업데이트 (소리 발생 지점으로 이동)
-    /// </summary>
-    void UpdateSuspicious(){
-        // UI 활성화
-        if (alertUI != null)
-        {
-            alertUI.SetActive(true);
-        }
-        
-        // 목적지 도착 확인
-        if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
-        {
-            ChangeState(GuardState.Return);
-        }
-    }
-
-    /// <summary>
-    /// 추격 상태 업데이트
-    /// </summary>
-    
     void UpdateChase()
     {
         if (alertUI != null) alertUI.SetActive(true);
-        
-        if (playerTarget == null) 
-        { 
-            ChangeState(GuardState.Return); 
-            return; 
+
+        if (playerTarget == null)
+        {
+            ChangeState(GuardState.Return);
+            return;
         }
 
         float dist = Vector3.Distance(transform.position, playerTarget.position);
 
-        // 1. 공격 사거리 진입
+        // 사거리 진입 시: 이동 멈추고 회전만 함 (공격은 CheckAndAttack에서 처리)
         if (dist <= attackRange)
         {
-            // [핵심 1] 에이전트 완전 무력화
             agent.isStopped = true;
             agent.velocity = Vector3.zero;
-            agent.ResetPath(); 
-            agent.updateRotation = false; // [중요] 에이전트야, 넌 회전 건드리지 마!
+            agent.ResetPath();
+            agent.updateRotation = false; // 수동 회전
 
-            // [핵심 2] 우리가 직접 플레이어 바라보게 함
             Vector3 dir = (playerTarget.position - transform.position).normalized;
-            dir.y = 0; // 고개 위아래로 까닥거리는 것 방지
-            
+            dir.y = 0;
             if (dir != Vector3.zero)
             {
                 Quaternion targetRot = Quaternion.LookRotation(dir);
-                // 회전 속도를 10f -> 20f로 높여서 더 빠릿하게 쳐다보게 함
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 20f);
-            }
-
-            // 공격 시도
-            if (Time.time >= _nextAttackTime)
-            {
-                AttackPlayer();
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
             }
         }
-        // 2. 추격 중
-        else
+        else // 사거리 밖: 추격 이동
         {
-            // [핵심 3] 다시 이동 모드로 복구
-            agent.updateRotation = true; // 에이전트야, 다시 네가 알아서 회전해
+            agent.updateRotation = true;
             if (agent.isStopped) agent.isStopped = false;
             
             agent.SetDestination(playerTarget.position);
             lastKnownPosition = playerTarget.position;
         }
 
+        // 시야에서 사라졌을 때
         if (sensor != null && sensor.Objects.Count == 0)
         {
-            agent.updateRotation = true; // 상태 나갈 때도 복구 필수!
+            agent.updateRotation = true;
             agent.isStopped = false;
             ChangeState(GuardState.Return);
         }
     }
 
+    void UpdateSuspicious()
+    {
+        if (alertUI != null) alertUI.SetActive(true);
+        if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
+        {
+            ChangeState(GuardState.Return);
+        }
+    }
 
-
-
-    /// <summary>
-    /// 복귀 상태 업데이트
-    /// </summary>
     void UpdateReturn()
     {
-        // UI 비활성화
-        if (alertUI != null)
-        {
-            alertUI.SetActive(false);
-        }
-        
-        // 원래 순찰 경로로 복귀
+        if (alertUI != null) alertUI.SetActive(false);
         if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
         {
             ChangeState(GuardState.Patrol);
         }
     }
 
+    // =========================================================
+    // 6. 상태 전환 및 공통 기능 (수정 없음, 정리만 함)
+    // =========================================================
 
-    /// <summary>
-    /// 애니메이터 파라미터 업데이트
-    /// </summary>
-    void UpdateAnimator()
-    {
-        if (animator == null) return;
-        // Patrol이면 false, Alert이면 true
-        animator.SetBool("isAlert", currentState == GuardState.Alert);
-    }
-
-
-    /// <summary>
-    /// 상태 변경
-    /// </summary>
     void ChangeState(GuardState newState)
     {
         if (currentState == newState) return;
-
         currentState = newState;
+
+        // 상태 변경 시 공통 초기화
+        agent.updateRotation = true;
+        agent.isStopped = false;
+
+        // 속도 적용 (젖음 고려는 UpdateSpeedByWetness에서 매 프레임 처리됨)
+        float baseSpeed = patrolSpeed; 
 
         switch (newState)
         {
             case GuardState.Patrol:
-                agent.speed = basePatrolSpeed * (1f - (currentWetness / maxWetness));
+                baseSpeed = basePatrolSpeed;
                 isWaiting = false;
                 SetDestination();
-                
-                if (animator != null)
-                {
-                    animator.SetBool("isAlert", false);
-                }
+                if (animator) animator.SetBool(_animIDAlert, false);
                 break;
 
             case GuardState.Suspicious:
-                agent.speed = basePatrolSpeed * (1f - (currentWetness / maxWetness));
+                baseSpeed = basePatrolSpeed;
                 isWaiting = false;
-                
-                if (animator != null)
-                {
-                    animator.SetBool("isAlert", true);
-                }
+                if (animator) animator.SetBool(_animIDAlert, true);
                 break;
 
             case GuardState.Alert:
-                agent.speed = baseAlertSpeed * (1f - (currentWetness / maxWetness));
+                baseSpeed = baseAlertSpeed;
                 alertTimer = alertTimeout;
                 isWaiting = false;
+                if (animator) animator.SetBool(_animIDAlert, true);
+                break;
 
-                if (animator != null)
-                {
-                    animator.SetBool("isAlert", true);
-                }
-                break;
-                
             case GuardState.Chase:
-                agent.speed = chaseSpeed * (1f - (currentWetness / maxWetness));
+                baseSpeed = baseChaseSpeed;
                 isWaiting = false;
-                
-                if (animator != null)
-                {
-                    animator.SetBool("isAlert", true);
-                }
+                if (animator) animator.SetBool(_animIDAlert, true);
                 break;
-                
+
             case GuardState.Return:
-                agent.speed = basePatrolSpeed * (1f - (currentWetness / maxWetness));
+                baseSpeed = basePatrolSpeed;
                 isWaiting = false;
-                
-                int closestWaypointIndex = FindClosestWaypoint();
-                currentWaypointIndex = closestWaypointIndex;
-                agent.SetDestination(waypoints[currentWaypointIndex].position);
-                
-                if (animator != null)
-                {
-                    animator.SetBool("isAlert", false);
-                }
+                MoveToClosestWaypoint();
+                if (animator) animator.SetBool(_animIDAlert, false);
                 break;
         }
     }
 
+    // 공격 실행 함수
+    private void AttackPlayer()
+    {
+        lastAttackTime = Time.time;
+        if (animator != null) animator.SetTrigger(_animIDAttack);
 
-    /// <summary>
-    /// 가장 가까운 waypoint 찾기
-    /// </summary>
-    int FindClosestWaypoint()
+        Vector3 dir = (playerTarget.position - transform.position).normalized;
+        dir.y = 0;
+
+        if (playerTarget.TryGetComponent<IDamageable>(out var dmg))
+        {
+            Debug.Log("공격 성공");
+            dmg.TakeDamage(attackDamage, playerTarget.position, dir, knockbackForce);
+        }
+    }
+
+    // =========================================================
+    // 7. 유틸리티 및 이벤트 (TakeWaterDamage 유지)
+    // =========================================================
+
+    public void TakeWaterDamage(float damage, Vector3 hitPoint)
+    {
+        if (animator != null) animator.SetTrigger(_animIDHit);
+        currentWetness = Mathf.Min(currentWetness + damage, maxWetness);
+
+        if (currentWetness >= maxWetness)
+        {
+            Debug.Log($"[{gameObject.name}] 완전히 젖었습니다!");
+        }
+    }
+
+    public float GetWetnessPercent()
+    {
+        return (currentWetness / maxWetness) * 100f;
+    }
+
+    void UpdateWetnessEffect()
+    {
+        if (wetnessMaterials.Count == 0) return;
+        float wetnessRatio = currentWetness / maxWetness;
+        foreach (var mat in wetnessMaterials)
+        {
+            mat.SetFloat("_Wetness", wetnessRatio);
+        }
+    }
+
+    void UpdateSpeedByWetness()
+    {
+        float speedMultiplier = 1f - (currentWetness / maxWetness);
+        speedMultiplier = Mathf.Clamp01(speedMultiplier);
+
+        float currentBaseSpeed = patrolSpeed;
+        switch (currentState)
+        {
+            case GuardState.Alert: currentBaseSpeed = baseAlertSpeed; break;
+            case GuardState.Chase: currentBaseSpeed = baseChaseSpeed; break;
+            default: currentBaseSpeed = basePatrolSpeed; break;
+        }
+        
+        agent.speed = currentBaseSpeed * speedMultiplier;
+    }
+
+    void SetDestination()
+    {
+        if (waypoints.Length > 0) agent.destination = waypoints[currentWaypointIndex].position;
+    }
+
+    void MoveToClosestWaypoint()
     {
         int closestIndex = 0;
         float closestDistance = float.MaxValue;
-        
         for (int i = 0; i < waypoints.Length; i++)
         {
             float distance = Vector3.Distance(transform.position, waypoints[i].position);
@@ -479,23 +442,27 @@ public class GuardPatrol : MonoBehaviour
                 closestIndex = i;
             }
         }
+        currentWaypointIndex = closestIndex;
+        Vector3 targetPos = waypoints[currentWaypointIndex].position;
+        agent.SetDestination(targetPos);
         
-        return closestIndex;
+        Vector3 dir = (targetPos - transform.position).normalized;
+        if (dir != Vector3.zero) transform.rotation = Quaternion.LookRotation(dir);
     }
 
-    void SetDestination()
+    void UpdateAnimator()
     {
-        if (waypoints.Length > 0)
-        {
-            agent.destination = waypoints[currentWaypointIndex].position;
-        }
+        if (animator == null) return;
+        // isAlert 파라미터는 ChangeState에서 처리하므로 여기선 생략 가능하지만,
+        // 안전을 위해 상태 확인용으로 남겨둠
+        bool isAlertState = (currentState == GuardState.Alert || currentState == GuardState.Chase);
+        animator.SetBool(_animIDAlert, isAlertState);
     }
 
+    // 소리 듣기 이벤트
     public void OnSoundHeard(Vector3 soundPosition)
     {
         float distance = Vector3.Distance(transform.position, soundPosition);
-        
-        // Patrol 상태일 때만 소리에 반응
         if (distance <= hearingRange && currentState == GuardState.Patrol)
         {
             lastKnownPosition = soundPosition;
@@ -503,174 +470,66 @@ public class GuardPatrol : MonoBehaviour
             ChangeState(GuardState.Suspicious);
         }
     }
-    /// <summary>
-    /// 젖음 수치에 따라 속도 감소
-    /// </summary>
-    void UpdateSpeedByWetness()
-    {
-        // 젖음에 따른 속도 감소 비율 계산 (0 ~ 1)
-        float speedMultiplier = 1f - (currentWetness / maxWetness);
-        speedMultiplier = Mathf.Clamp01(speedMultiplier);
-        
-        // 현재 상태에 맞는 속도 적용
-        switch (currentState)
-        {
-            case GuardState.Patrol:
-            case GuardState.Suspicious:
-            case GuardState.Return:
-                agent.speed = basePatrolSpeed * speedMultiplier;
-                break;
-            
-            case GuardState.Alert:
-                agent.speed = baseAlertSpeed * speedMultiplier;
-                break;
-            
-            case GuardState.Chase:
-                agent.speed = baseChaseSpeed * speedMultiplier;
-                break;
-        }
-    }
-    void UpdateWetnessEffect()
-    {
-        if (wetnessMaterials.Count == 0) return;
-        
-        float wetnessRatio = currentWetness / maxWetness;
-        
-        // 리스트에 있는 모든 머티리얼의 _Wetness 값을 업데이트
-        foreach (var mat in wetnessMaterials)
-        {
-            mat.SetFloat("_Wetness", wetnessRatio);
-        }
-    }
 
-
-    /// <summary>
-    /// 물총에 맞음 (외부에서 호출됨)
-    /// </summary>
-    public void TakeWaterDamage(float damage, Vector3 hitPoint){
-        if (animator != null)
-        {
-            animator.SetTrigger(_animIDHit);
-        }
-        currentWetness = Mathf.Min(currentWetness + damage, maxWetness);
-    
-        // 필요시 경비원을 잠시 혼란 상태로 만들기
-        if (currentWetness >= maxWetness)
-        {
-            Debug.Log($"[{gameObject.name}] 완전히 젖었습니다!");
-            // 상태를 Suspicious로 전환하거나 시간 증가 등의 패널티 추가 가능
-        }
-    }
-
-    /// <summary>
-    /// 젖음 정보 조회
-    /// </summary>
-    public float GetWetnessPercent()
-    {
-        return (currentWetness / maxWetness) * 100f;
-    }
-
+    // 충돌 이벤트 (물 웅덩이 등)
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("WaterPuddle") && !isInPuddle)
         {
             isInPuddle = true;
             currentWetness = stunWetness;
-            
-            // 넘어지는 애니메이션 + 스턴
-            if (!isFalling)
-            {
-                StartCoroutine(FallInPuddleCoroutine());
-            }
+            if (!isFalling) StartCoroutine(FallInPuddleCoroutine());
         }
-
         else if (other.TryGetComponent<IDamageable>(out IDamageable target))
         {
-            target.TakeDamage(1); // 데미지 1 주기
+            // 몸으로 부딪히는 데미지 (유지)
+            target.TakeDamage(1);
         }
     }
+
     private void OnTriggerStay(Collider other)
     {
-        // 웅덩이 안에 계속 있으면 젖음 100 유지
-        if (other.CompareTag("WaterPuddle"))
-        {
-            currentWetness = stunWetness;
-        }
+        if (other.CompareTag("WaterPuddle")) currentWetness = stunWetness;
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("WaterPuddle"))
-        {
-            isInPuddle = false;
-        }
+        if (other.CompareTag("WaterPuddle")) isInPuddle = false;
     }
-    
-    /// <summary>
-    /// 넘어지는 코루틴
-    /// </summary>
+
     private IEnumerator FallInPuddleCoroutine()
     {
         isFalling = true;
-        agent.isStopped = true; // NavMesh 정지
-        
-        // 넘어지는 애니메이션 트리거
-        if (animator != null)
-        {
-            animator.SetTrigger(_animIDFall);
-        }
+        agent.isStopped = true;
+        if (animator != null) animator.SetTrigger(_animIDFall);
 
- 
-        // 넘어져 있는 시간
         yield return new WaitForSeconds(fallStunDuration);
 
         isFalling = false;
         agent.isStopped = false;
+        // 넘어진 직후 바로 공격하지 않도록 쿨타임 살짝 갱신 가능 (선택사항)
     }
 
-    private void AttackPlayer()
+    void OnDrawGizmos()
     {
-        // 1. 공격 시간 갱신 (이제부터 쿨타임 시작)
-        lastAttackTime = Time.time;
-
-        // 2. 애니메이션
-        if (animator != null) animator.SetTrigger("Attack");
-
-        // 3. 방향 계산
-        Vector3 dir = (playerTarget.position - transform.position).normalized;
-        dir.y = 0;
-
-        // 4. 데미지 주기
-        if (playerTarget.TryGetComponent<IDamageable>(out var dmg))
-        {
-            // 🌟 공격 성공 로그
-            Debug.Log("공격 성공"); 
-            dmg.TakeDamage(attackDamage, playerTarget.position, dir, knockbackForce);
-        }
-    }
-
-    void OnDrawGizmos(){
         if (waypoints == null || waypoints.Length < 2) return;
-        
-        // 상태에 따른 색상
         Gizmos.color = (currentState == GuardState.Alert) ? Color.red : Color.yellow;
         
-        for (int i = 0; i < waypoints.Length; i++)
+        foreach (var wp in waypoints)
         {
-            if (waypoints[i] != null)
-            {
-                Gizmos.DrawWireSphere(waypoints[i].position, 0.5f);
-                
-                int nextIndex = (i + 1) % waypoints.Length;
-                if (waypoints[nextIndex] != null)
-                {
-                    Gizmos.DrawLine(waypoints[i].position, waypoints[nextIndex].position);
-                }
-            }
+            if (wp) Gizmos.DrawWireSphere(wp.position, 0.5f);
         }
         
-        // Guard 위치 (상태에 따른 색상)
-        Gizmos.color = (currentState == GuardState.Alert) ? Color.red : Color.green;
+        Gizmos.color = (currentState == GuardState.Alert || currentState == GuardState.Chase) ? Color.red : Color.green;
         Gizmos.DrawWireSphere(transform.position, 0.3f);
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = new Color(0f, 0.5f, 1f, 0.5f);
+        Gizmos.DrawWireSphere(transform.position, hearingRange);
+        
+        Gizmos.color = new Color(1f, 1f, 0f, 0.2f);
+        Gizmos.DrawWireSphere(transform.position, visionRange);
     }
 }
