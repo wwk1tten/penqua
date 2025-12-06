@@ -2,17 +2,25 @@ using UnityEngine;
 using System.Collections.Generic; 
 using UnityEngine.UI; 
 using TMPro;
+using UnityEngine.UIElements;
+using Image = UnityEngine.UI.Image;
+using UnityEngine.SceneManagement;
+using System.Collections;
 
 public class GameManager : MonoBehaviour
 {
+    [Header("게임 목표 설정")]
+    public int totalCapsulesToCollect = 3; // 목표 개수
+    public List<string> collectedCapsuleIDs = new List<string>(); // 획득한 캡슐 ID 목록
+    [Header("UI 연결")]
     public static GameManager Instance { get; private set; }
-    public HashSet<string> collectedCapsuleIDs = new HashSet<string>(); // 수집된 캡슐의 ID를 저장할 Set (중복 방지)
-    
-    public int totalCapsulesToCollect = 3; 
     public TMP_Text capsuleCountText; // 캡슐 카운트
-    public Image[] hearts; // 인스펙터에서 하트 이미지 3개 연결
-    public Sprite fullHeart;
-    public Sprite emptyHeart; // 비어있는 하트 이미지 (선택 사항)
+    public GameObject ClearPanel;
+    public CanvasGroup damageOverlayGroup; 
+    public Image damageFlashImage; // (선택) 맞을 때 번쩍일 빨간 화면
+    [Header("타격 연출 설정")]
+    public Color flashColor = new Color(1f, 1f, 1f, 0.5f); // 흰색 반투명 추천
+    public float flashDuration = 0.2f;
 
     void Awake()
     {
@@ -29,6 +37,7 @@ public class GameManager : MonoBehaviour
     }
     
     // 캡슐이 수집되었을 때 호출될 함수
+    
     public void OnCapsuleCollected(string capsuleID)
     {
         if (!collectedCapsuleIDs.Contains(capsuleID))
@@ -37,7 +46,21 @@ public class GameManager : MonoBehaviour
             Debug.Log($"캡슐 {capsuleID} 수집! (총 {collectedCapsuleIDs.Count}개)");
             
             // UI 업데이트
-            UpdateUI();
+            //UpdateUI();
+        }
+    }
+
+    public void Replay(){
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    public void BackToTitle(){
+        SceneManager.LoadScene("TitleScene");
+    }
+    public void ShowInventoryStatus()
+    {
+        if(capsuleCountText != null){
+            capsuleCountText.text = $"총 {collectedCapsuleIDs.Count}개 수집";
         }
     }
     
@@ -46,41 +69,55 @@ public class GameManager : MonoBehaviour
     {
         return collectedCapsuleIDs.Count >= 3;
     }
-    
-    void UpdateUI()
-    {
-        if (capsuleCountText != null)
-        {
-            capsuleCountText.text = $"{collectedCapsuleIDs.Count} / 3 remaining";
-        }
-    }
 
     public void GameClear(){
-        
+        if (ClearPanel != null) ClearPanel.SetActive(true);
     }
 
-    public void UpdateHearts(int currentHealth)
+    public void UpdateVignette(int currentHealth, int maxHealth)
     {
-        // 방어 코드: 체력이 음수면 0으로 처리
-        if (currentHealth < 0) currentHealth = 0;
-        // 방어 코드: 체력이 최대 하트 개수보다 많으면 그에 맞춤
-        if (currentHealth > hearts.Length) currentHealth = hearts.Length;
+        // 1. 체력 비율 계산 (0.0 ~ 1.0)
+        float healthPercent = (float)currentHealth / maxHealth;
 
-        for (int i = 0; i < hearts.Length; i++)
+        // 2. 비네팅 투명도 계산 (체력이 적을수록 불투명해짐)
+        // 체력 100% -> alpha 0 (안 보임)
+        // 체력 0% -> alpha 1 (완전 진하게 보임)
+        float targetAlpha = 1f - healthPercent;
+
+        // 3. 부드럽게 적용하지 않고 즉시 적용 (반응성을 위해)
+        if (damageOverlayGroup != null)
         {
-            // 1. 하트 이미지가 보이도록 켭니다. (방법1을 쓰다가 넘어왔을 때 꺼져있을 수 있음)
-            hearts[i].enabled = true;
-
-            if (i < currentHealth)
-            {
-                // 현재 체력보다 작으면 -> 꽉 찬 하트
-                hearts[i].sprite = fullHeart;
-            }
-            else
-            {
-                // 현재 체력보다 크거나 같으면 -> 빈 하트
-                hearts[i].sprite = emptyHeart;
-            }
+            damageOverlayGroup.alpha = targetAlpha;
         }
+    }
+
+    public void TriggerDamageFlash()
+    {
+        if (damageFlashImage != null)
+        {
+            StartCoroutine(FlashRoutine());
+        }
+    }
+
+    IEnumerator FlashRoutine()
+    {
+        // 빨간색 확 켜기
+        Color color = damageFlashImage.color;
+        color.a = 0.5f; // 반투명하게
+        damageFlashImage.color = color;
+
+        // 서서히 사라지기
+        float elapsed = 0f;
+        while (elapsed < flashDuration)
+        {
+            elapsed += Time.deltaTime;
+            color.a = Mathf.Lerp(0.5f, 0f, elapsed / flashDuration);
+            damageFlashImage.color = color;
+            yield return null;
+        }
+
+        // 확실하게 끄기
+        color.a = 0f;
+        damageFlashImage.color = color;
     }
 }

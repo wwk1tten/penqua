@@ -42,8 +42,7 @@ public class EscapeZone : MonoBehaviour
 
                 Debug.Log($"아직 {remaining}명의 친구가 갇혀있어!");
                 
-                // 여기에 플레이어 머리 위 말풍선 띄우는 함수 호출
-                // UIManager.Instance.ShowDialogue(notReadyMessage);
+                GameManager.Instance.ShowInventoryStatus();
             }
         }
     }

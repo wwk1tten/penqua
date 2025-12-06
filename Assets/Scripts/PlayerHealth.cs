@@ -67,8 +67,25 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (isInvincible || currentHealth <= 0 || isStunned) return;
 
         currentHealth -= damage;
-        OnHealthChanged?.Invoke(currentHealth);
+        
+        // 방어 코드: 음수 방지
+        if (currentHealth < 0) currentHealth = 0;
+
         Debug.Log($"아야! 남은 체력: {currentHealth}");
+
+        // ✅ 변경: 하트 업데이트 대신 비네팅 및 플래시 효과 호출
+        // (싱글톤 패턴을 쓴다고 가정: GameManager.Instance)
+        if (GameManager.Instance != null)
+        {
+            // 1. 지속적인 데미지 효과 (금 간 화면) 업데이트
+            GameManager.Instance.UpdateVignette(currentHealth, maxHealth);
+            
+            // 2. 순간적인 피격 효과 (붉은 번쩍임) 실행
+            GameManager.Instance.TriggerDamageFlash();
+        }
+
+        // 이벤트가 연결되어 있다면 이것도 유지 (다른 곳에서 쓸 수 있으므로)
+        OnHealthChanged?.Invoke(currentHealth);
 
         if (currentHealth <= 0)
         {
@@ -76,7 +93,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         }
         else
         {
-            // 데미지 입었을 때 넉백 코루틴 실행
             StartCoroutine(KnockbackRoutine(knockbackDir, knockbackForce));
             StartCoroutine(InvincibilityRoutine());
         }
