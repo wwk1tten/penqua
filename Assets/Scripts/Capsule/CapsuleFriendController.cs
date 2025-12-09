@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI; // NavMeshAgent를 사용하기 위해 추가
 using System.Collections;
-using Bitgem.VFX.StylisedWater;
 
 [RequireComponent(typeof(NavMeshAgent), typeof(Rigidbody))]
 public class CapsuleFriendController : MonoBehaviour

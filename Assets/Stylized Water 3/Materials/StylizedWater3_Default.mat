@@ -157,7 +157,7 @@ Material:
     - _CROSSPAN_INTERSECTIONOn: 1
     - _CausticsBrightness: 2
     - _CausticsChromance: 1
-    - _CausticsDistortion: 0.082
+    - _CausticsDistortion: 0.054
     - _CausticsOn: 1
     - _CausticsSpeed: 0.1
     - _CausticsTiling: 0.1

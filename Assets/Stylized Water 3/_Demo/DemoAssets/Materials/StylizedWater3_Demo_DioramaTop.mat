@@ -36,11 +36,10 @@ Material:
   - _SURFACE_FOAM
   - _WORLDSPACEUV_ON
   - _ZCLIP_ON
-  - _ZWRITE_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 3000
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: _BaseColor _ColorAbsorption _Direction _LightingOn _ShallowColor
@@ -157,11 +156,11 @@ Material:
     - _CROSSPAN_INTERSECTIONOn: 1
     - _CausticsBrightness: 2
     - _CausticsChromance: 1
-    - _CausticsDistortion: 0.23
+    - _CausticsDistortion: 0.116
     - _CausticsOn: 1
     - _CausticsSpeed: 0.1
     - _CausticsTiling: 0.2
-    - _ColorAbsorption: 0
+    - _ColorAbsorption: 0.001
     - _CrossPan_IntersectionOn: 0
     - _Cull: 0
     - _Cutoff: 0.5
@@ -291,6 +290,9 @@ Material:
     - _SunReflectionStrength: 10
     - _Surface: 0
     - _TEXTURE_INTERSECTIONOn: 0
+    - _TessMax: 15
+    - _TessMin: 0
+    - _TessValue: 16
     - _Texture_IntersectionOn: 1
     - _Tiling: 0.5
     - _Translucency: 1
@@ -319,7 +321,7 @@ Material:
     - _WorkflowMode: 1
     - _WorldSpaceUV: 1
     - _ZClip: 1
-    - _ZWrite: 1
+    - _ZWrite: 0
     m_Colors:
     - _BaseColor: {r: 0, g: 0.09564084, b: 0.1981132, a: 1}
     - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
@@ -335,7 +337,7 @@ Material:
     - _IntersectionColor: {r: 1, g: 1, b: 1, a: 1}
     - _NormalTiling: {r: 0.25, g: 0.25, b: 0, a: 0}
     - _RimColor: {r: 1, g: 1, b: 1, a: 1}
-    - _ShallowColor: {r: 0, g: 0.9411765, b: 0.41853154, a: 1}
+    - _ShallowColor: {r: 0, g: 0.9411765, b: 0.75563675, a: 1}
     - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
     - _WaterColor: {r: 0.21176466, g: 0.6745098, b: 1, a: 1}
     - _WaterShallowColor: {r: 0, g: 0.9394503, b: 1, a: 1}

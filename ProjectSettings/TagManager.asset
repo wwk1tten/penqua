@@ -9,6 +9,7 @@ TagManager:
   - Floor
   - WaterPuddle
   - WaterSource
+  - Water
   layers:
   - Default
   - TransparentFX

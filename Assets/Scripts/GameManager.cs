@@ -13,6 +13,8 @@ public class GameManager : MonoBehaviour
     public int totalCapsulesToCollect = 3; // 목표 개수
     public List<string> collectedCapsuleIDs = new List<string>(); // 획득한 캡슐 ID 목록
     [Header("UI 연결")]
+    [Header("연결된 시스템")] 
+    public ExitDoorController exitDoorController;
     public static GameManager Instance { get; private set; }
     public TMP_Text capsuleCountText; // 캡슐 카운트
     public GameObject ClearPanel;
@@ -43,10 +45,13 @@ public class GameManager : MonoBehaviour
         if (!collectedCapsuleIDs.Contains(capsuleID))
         {
             collectedCapsuleIDs.Add(capsuleID);
-            Debug.Log($"캡슐 {capsuleID} 수집! (총 {collectedCapsuleIDs.Count}개)");
+            Debug.Log($"capsule {capsuleID} collected! (total {collectedCapsuleIDs.Count})");
             
-            // UI 업데이트
-            //UpdateUI();
+            //  비상구 전구 갱신하기 
+            if (exitDoorController != null)
+            {
+                exitDoorController.UpdateLights(collectedCapsuleIDs.Count);
+            }
         }
     }
 
@@ -60,7 +65,7 @@ public class GameManager : MonoBehaviour
     public void ShowInventoryStatus()
     {
         if(capsuleCountText != null){
-            capsuleCountText.text = $"총 {collectedCapsuleIDs.Count}개 수집";
+            capsuleCountText.text = $"total {collectedCapsuleIDs.Count}collected";
         }
     }
     
