@@ -1,50 +1,88 @@
 using UnityEngine;
-using UnityEngine.SceneManagement; // 씬 이동을 위해 필수
+using Cinemachine; 
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 public class TitleManager : MonoBehaviour
 {
-    [Header("설정")]
-    public string gameSceneName = "Stage1"; // 이동할 게임 씬 이름
-    public GameObject startUI; // 'Press Any Key' 텍스트
-    public AudioClip splashSound; // 첨벙 소리
-    public AudioSource audioSource;
-    public GameObject transitionEffect; // (선택) 물방울 파티클
+    [Header("시네머신 카메라")]
+    public CinemachineVirtualCamera underwaterCam; // Priority 11
+    public CinemachineVirtualCamera surfaceCam;    // Priority 10
+    
+    [Header("타격감 (Impulse)")]
+    public CinemachineImpulseSource shakeSource;   // 쉐이크 발생기
 
-    private bool isStarting = false;
+    [Header("UI & Audio")]
+    public GameObject logoPanel;
+    public GameObject mainMenuUI;
+    public GameObject settingPanel;
+    public AudioSource bgmSource;
+    public AudioClip splashSound;
+    public AudioLowPassFilter lowPassFilter;
+    public ParticleSystem bubbleBurst;
+
+    private bool isStarted = false;
 
     void Update()
     {
-        // 이미 시작 중이면 입력 무시
-        if (isStarting) return;
-
-        // 아무 키나 누르거나 마우스 클릭 시
-        if (Input.anyKeyDown)
+        if (!isStarted && Input.anyKeyDown)
         {
-            StartCoroutine(StartGameRoutine());
+            StartGameSequence();
         }
     }
 
-    IEnumerator StartGameRoutine()
+    void StartGameSequence()
     {
-        isStarting = true;
+        isStarted = true;
 
-        // 1. UI 숨기기 (깔끔하게)
-        if(startUI != null) startUI.SetActive(false);
+        // 1. 임팩트 (소리 + 쉐이크 + 파티클)
+        bgmSource.PlayOneShot(splashSound);
+        if(bubbleBurst != null) bubbleBurst.Play();
+        if(logoPanel != null) logoPanel.SetActive(false);
 
-        // 2. 효과음 재생 (첨벙!)
-        if(audioSource != null && splashSound != null)
+        // ★ 시네머신 쉐이크 발생 (한 줄로 끝!)
+        // GenerateImpulse()를 호출하면 설정된 진동이 카메라에 전달됨
+        if(shakeSource != null) shakeSource.GenerateImpulse();
+
+        // 2. 카메라 전환 (핵심!)
+        // 물속 카메라의 우선순위를 낮추면 -> 자동으로 물 밖 카메라(10)가 활성화됨
+        // 시네머신 Brain이 설정된 시간(2초) 동안 알아서 부드럽게 이동시킴
+        underwaterCam.Priority = 9; 
+
+        // 3. 오디오 필터 및 UI 처리는 코루틴으로 타이밍 맞춤
+        StartCoroutine(AudioAndUIProcess());
+    }
+
+    IEnumerator AudioAndUIProcess()
+    {
+        // 카메라가 올라가는 시간(2초) 동안 소리도 같이 맑아지게
+        float duration = 2.0f; // Brain의 Blend Time과 맞추세요
+        float elapsed = 0f;
+        float startCutoff = lowPassFilter.cutoffFrequency;
+
+        while (elapsed < duration)
         {
-            audioSource.PlayOneShot(splashSound);
+            elapsed += Time.deltaTime;
+            lowPassFilter.cutoffFrequency = Mathf.Lerp(startCutoff, 22000f, elapsed / duration);
+            yield return null;
         }
 
-        // 3. (선택) 파티클 효과나 카메라 무빙이 있다면 여기서 실행
-        if(transitionEffect != null) transitionEffect.SetActive(true);
+        lowPassFilter.enabled = false;
+        if(mainMenuUI != null){
+            logoPanel.SetActive(false);
+            mainMenuUI.SetActive(true);
+        }
 
-        // 4. 소리가 들릴 틈을 줌 (1~2초 대기)
-        yield return new WaitForSeconds(1.5f);
-
-        // 5. 씬 이동
-        SceneManager.LoadScene(gameSceneName);
     }
+
+    public void OnPlayButtonClicked(){
+        SceneManager.LoadScene("SampleScene");
+    }
+
+    public void OnSettingButtonClicked(){
+        if(settingPanel != null){
+            settingPanel.SetActive(true);
+        }
+    }
+
 }

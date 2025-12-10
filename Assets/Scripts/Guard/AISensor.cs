@@ -89,92 +89,117 @@ public class AISensor : MonoBehaviour
         return true;
     }
 
-    Mesh CreateWedgeMesh(){
+    Mesh CreateWedgeMesh()
+    {
         Mesh newMesh = new Mesh();
 
-        int segments = 10;
-        int numTriangles = (segments * 4) + (2 * segments); // 4각 면 + top/bottom
+        int segments = 20; // ★ 벽에 닿는 모양을 부드럽게 하려면 숫자를 늘리세요 (10 -> 20 추천)
+        int numTriangles = (segments * 4) + (2 * segments);
         int numVertices = numTriangles * 3;
 
         Vector3[] vertices = new Vector3[numVertices];
         int[] triangles = new int[numVertices];
-        
+        Vector2[] uvs = new Vector2[numVertices];
+
         Vector3 bottomCenter = Vector3.zero;
         Vector3 topCenter = Vector3.up * height;
 
         int vert = 0;
-        
-        float currentAngle = -angle / 2f; 
+
+        float currentAngle = -angle / 2f;
         float deltaAngle = angle / segments;
-        
-        // 모든 segment의 포인트 저장
+
         Vector3[] bottomPoints = new Vector3[segments + 1];
         Vector3[] topPoints = new Vector3[segments + 1];
-        
-        for(int i = 0; i <= segments; ++i)
+
+        // ★ [핵심 변경] 각 세그먼트마다 레이캐스트를 쏴서 거리 계산
+        for (int i = 0; i <= segments; ++i)
         {
-            Vector3 direction = Quaternion.Euler(0, currentAngle + (deltaAngle * i), 0) * Vector3.forward;            
+            // 1. 로컬 방향 계산
+            Vector3 localDir = Quaternion.Euler(0, currentAngle + (deltaAngle * i), 0) * Vector3.forward;
             
-            bottomPoints[i] = direction * distance;
+            // 2. 월드 방향으로 변환 (레이캐스트용)
+            Vector3 worldDir = transform.TransformDirection(localDir);
+
+            // 3. 레이캐스트 발사 (중심 높이에서 발사)
+            float actualDistance = distance;
+            
+            // 높이의 중간 지점에서 레이를 쏩니다.
+            Vector3 rayOrigin = transform.position + (Vector3.up * height * 0.5f);
+
+            RaycastHit hit;
+            // occlusionLayers에 포함된 물체(벽)에만 반응
+            if (Physics.Raycast(rayOrigin, worldDir, out hit, distance, occlusionLayers))
+            {
+                // 벽에 맞았다면 거리를 충돌 지점까지로 단축 (약간의 오차 방지를 위해 살짝 줄임)
+                actualDistance = hit.distance - 0.05f; 
+            }
+
+            // 4. 계산된 거리로 정점 위치 설정
+            bottomPoints[i] = localDir * actualDistance;
             topPoints[i] = bottomPoints[i] + Vector3.up * height;
         }
 
-        // ===== LEFT SIDE =====
-        vertices[vert++] = bottomCenter;
-        vertices[vert++] = bottomPoints[0];
-        vertices[vert++] = topPoints[0];
-
-        vertices[vert++] = topPoints[0];
-        vertices[vert++] = topCenter;
-        vertices[vert++] = bottomCenter;
-
-        // ===== RIGHT SIDE =====
-        vertices[vert++] = bottomCenter;
-        vertices[vert++] = topCenter;
-        vertices[vert++] = topPoints[segments];
-
-        vertices[vert++] = topPoints[segments];
-        vertices[vert++] = bottomPoints[segments];
-        vertices[vert++] = bottomCenter;
-
-        // ===== FAR SIDE (Subdivisions) =====
-        for(int i = 0; i < segments; ++i)
+        // --- 이하 정점/UV 생성 로직은 동일합니다 ---
+        
+        void AddVertex(Vector3 position, float u, float v)
         {
-            // 아래 삼각형
-            vertices[vert++] = bottomPoints[i];
-            vertices[vert++] = bottomPoints[i + 1];
-            vertices[vert++] = topPoints[i + 1];
-
-            // 위 삼각형
-            vertices[vert++] = topPoints[i + 1];
-            vertices[vert++] = topPoints[i];
-            vertices[vert++] = bottomPoints[i];
+            vertices[vert] = position;
+            uvs[vert] = new Vector2(u, v);
+            vert++;
         }
 
-        // ===== TOP SIDE (Fan triangulation) =====
-        for(int i = 0; i < segments; ++i)
+        // LEFT SIDE
+        AddVertex(bottomCenter, 0, 0);
+        AddVertex(bottomPoints[0], 1, 0);
+        AddVertex(topPoints[0], 1, 1);
+        AddVertex(topPoints[0], 1, 1);
+        AddVertex(topCenter, 0, 1);
+        AddVertex(bottomCenter, 0, 0);
+
+        // RIGHT SIDE
+        AddVertex(bottomCenter, 0, 0);
+        AddVertex(topCenter, 0, 1);
+        AddVertex(topPoints[segments], 1, 1);
+        AddVertex(topPoints[segments], 1, 1);
+        AddVertex(bottomPoints[segments], 1, 0);
+        AddVertex(bottomCenter, 0, 0);
+
+        // FAR SIDE
+        for (int i = 0; i < segments; ++i)
         {
-            vertices[vert++] = topCenter;
-            vertices[vert++] = topPoints[i];
-            vertices[vert++] = topPoints[i + 1];
+            AddVertex(bottomPoints[i], 1, 0);
+            AddVertex(bottomPoints[i + 1], 1, 0);
+            AddVertex(topPoints[i + 1], 1, 1);
+            AddVertex(topPoints[i + 1], 1, 1);
+            AddVertex(topPoints[i], 1, 1);
+            AddVertex(bottomPoints[i], 1, 0);
         }
 
-        // ===== BOTTOM SIDE (Fan triangulation) =====
-        for(int i = 0; i < segments; ++i)
+        // TOP SIDE
+        for (int i = 0; i < segments; ++i)
         {
-            vertices[vert++] = bottomCenter;
-            vertices[vert++] = bottomPoints[i + 1];
-            vertices[vert++] = bottomPoints[i];
+            AddVertex(topCenter, 0, 1);
+            AddVertex(topPoints[i], 1, 1);
+            AddVertex(topPoints[i + 1], 1, 1);
         }
 
-        // Triangles 배열
-        for(int i = 0; i < vert; ++i) 
+        // BOTTOM SIDE
+        for (int i = 0; i < segments; ++i)
+        {
+            AddVertex(bottomCenter, 0, 0);
+            AddVertex(bottomPoints[i + 1], 1, 0);
+            AddVertex(bottomPoints[i], 1, 0);
+        }
+
+        for (int i = 0; i < vert; ++i)
         {
             triangles[i] = i;
         }
 
         newMesh.vertices = vertices;
         newMesh.triangles = triangles;
+        newMesh.uv = uvs;
         newMesh.RecalculateNormals();
 
         return newMesh;
