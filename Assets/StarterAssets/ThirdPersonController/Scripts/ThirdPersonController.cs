@@ -636,9 +636,17 @@ namespace StarterAssets
                 {
                     var index = Random.Range(0, FootstepAudioClips.Length);
                     AudioSource.PlayClipAtPoint(FootstepAudioClips[index], transform.TransformPoint(_controller.center), FootstepAudioVolume);
+                    
+                    float currentSpeed = _controller.velocity.magnitude; // 현재 실제 이동 속도
+                    float noiseRange = 3.0f; // 기본 걷기 범위
+                    
+                    if (currentSpeed > MoveSpeed + 1.0f) 
+                    {
+                        noiseRange = .0f; // 뛰기 범위
+                    }
 
-                    // AI가 들을 수 있도록 소리 이벤트 발생
-                    SoundEmitter.MakeSound(transform.position, 10f); // 10f는 청각 범위
+                    // 시각화 및 소리 발생
+                    SoundEmitter.MakeSound(transform.position, noiseRange);
                 }
             }
         }
