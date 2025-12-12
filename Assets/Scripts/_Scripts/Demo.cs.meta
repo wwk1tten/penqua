@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: cfe44925901104162abb93aa988b393b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 149267
+  packageName: Penguin - Quirky Series
+  packageVersion: 1.4.1
+  assetPath: Assets/Scripts/_Scripts/Demo.cs
+  uploadId: 752931

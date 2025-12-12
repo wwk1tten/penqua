@@ -36,7 +36,6 @@ public class FollowerManager : MonoBehaviour
         if (point != null)
         {
             availablePoints.Enqueue(point);
-            Debug.Log($"자리를 반납받았습니다: {point.name}");
         }
     }
 }

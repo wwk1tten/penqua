@@ -135,6 +135,7 @@ namespace StarterAssets
         private float _rotationVelocity;
         private float _verticalVelocity;
         private float _terminalVelocity = 53.0f;
+        private float nextRippleTime = 0f;
         private Vector3 _slideVelocity = Vector3.zero;
 
         // timeout deltatime
@@ -323,14 +324,12 @@ namespace StarterAssets
                 _cinemachineTargetYaw, 0.0f);
         }
 
-        private void Move()
-        {
+        private void Move(){
             float targetSpeed;
             float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
 
             // 1. 조준 상태 로직
-            if (_isAiming)
-            {
+            if (_isAiming){
                 targetSpeed = _isCrouching ? CrouchingSpeed : (_input.sprint ? SprintSpeed : MoveSpeed);
 
                 if (_input.move == Vector2.zero) targetSpeed = 0.0f;
@@ -402,9 +401,63 @@ namespace StarterAssets
                     _animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
                 }
             }
-            // 3. 일반 및 수영 상태 로직 (이하 동일)
+            // 3. 수영 상태 - 펭귄 특화 로직
+            else if (_isSwimming)
+            {
+                // A. 속도 설정: 펭귄이니까 걷기보다 훨씬 빠르게 (예: 1.5배 ~ 2배)
+                float penguinSwimSpeed = swimSpeed; // Inspector에서 SprintSpeed보다 높게 설정하세요.
+                
+                // 입력이 없어도 바로 0이 되지 않도록 처리 (관성)
+                if (_input.move == Vector2.zero) targetSpeed = 0.0f;
+                else targetSpeed = penguinSwimSpeed;
+
+                // B. 가감속 로직 (물속 저항 구현)
+                // 지상보다 SpeedChangeRate를 낮게 잡아서(Time.deltaTime * 2f 등) 미끄러지듯 가속/감속되게 함
+                float swimAcceleration = 2.0f; // 지상보다 낮게 설정하여 관성 부여
+                
+                _animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * swimAcceleration);
+                if (_animationBlend < 0.01f) _animationBlend = 0f;
+                
+                // 실제 이동 속도에 반영
+                _speed = _animationBlend; 
+
+                // C. 회전 로직
+                Vector3 inputDir = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
+                if (_input.move != Vector2.zero)
+                {
+                    _targetRotation = Mathf.Atan2(inputDir.x, inputDir.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
+                    // 물속에서는 회전이 지상보다 조금 더 느리고 부드럽게 (RotationSmoothTime을 늘림)
+                    float swimRotationSmoothTime = RotationSmoothTime * 1.5f; 
+                    float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity, swimRotationSmoothTime);
+                    transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
+                }
+
+                Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
+
+                // D. 부력 처리 (중요)
+                // 수영 중에는 중력(_verticalVelocity)을 0으로 만들거나, 
+                // 혹은 스페이스바(Jump)를 누르면 상승, C(Crouch)를 누르면 하강하는 로직으로 대체해야 함.
+                // 여기서는 일단 '수면 유지'를 위해 중력을 무시하는 예시입니다.
+                if (_verticalVelocity < 0) _verticalVelocity = 0f; 
+
+                // 최종 이동: 입력이 없어도 _speed(관성)가 남아있으면 계속 앞으로 전진함
+                // 펭귄은 수영할 때 전신을 쓰므로, 단순히 move.x, y가 아니라 '바라보는 방향'으로 계속 나아가게 함
+                if(_input.move != Vector2.zero || _speed > 0.1f)
+                {
+                    // 입력이 있을 땐 입력 방향, 없을 땐 현재 캐릭터가 보는 방향으로 관성 이동
+                    Vector3 moveDir = (_input.move != Vector2.zero) ? targetDirection.normalized : transform.forward;
+                    _controller.Move(moveDir * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+                }
+
+                // 애니메이터
+                if (_hasAnimator)
+                {
+                    _animator.SetFloat(_animIDSpeed, _animationBlend);
+                    _animator.SetFloat(_animIDMotionSpeed, 1f); // 수영은 모션 속도 일정하게
+                }
+            }
             else {
-                targetSpeed = _isCrouching ? CrouchingSpeed : (_isSwimming ? swimSpeed : (_input.sprint ? SprintSpeed : MoveSpeed));
+                targetSpeed = _isCrouching ? CrouchingSpeed : (_input.sprint ? SprintSpeed : MoveSpeed);
                 if (_input.move == Vector2.zero) targetSpeed = 0.0f;
 
                 float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
@@ -576,6 +629,7 @@ namespace StarterAssets
             }
             
             GameManager.Instance.OnCapsuleCollected(capsuleToActivate.capsuleID);
+            
             inventory.RemoveAt(currentInventoryIndex);
             
             currentInventoryIndex = (inventory.Count > 0) ? 0 : -1;
@@ -632,25 +686,29 @@ namespace StarterAssets
 
             if (animationEvent.animatorClipInfo.weight > 0.5f)
             {
+                float currentSpeed = _controller.velocity.magnitude; // 현재 실제 이동 속도
+                float noiseRange = 3.0f; // 기본 걷기 범위
                 if (FootstepAudioClips.Length > 0)
                 {
                     var index = Random.Range(0, FootstepAudioClips.Length);
                     AudioSource.PlayClipAtPoint(FootstepAudioClips[index], transform.TransformPoint(_controller.center), FootstepAudioVolume);
                     
-                    float currentSpeed = _controller.velocity.magnitude; // 현재 실제 이동 속도
-                    float noiseRange = 3.0f; // 기본 걷기 범위
-                    
                     if (currentSpeed > MoveSpeed + 1.0f) 
                     {
-                        noiseRange = .0f; // 뛰기 범위
+                        noiseRange = 6.0f; // 뛰기 범위
                     }
+                }
 
-                    // 시각화 및 소리 발생
+                if (Time.time >= nextRippleTime)
+                {
+                    // 3. 감지 로직 실행
                     SoundEmitter.MakeSound(transform.position, noiseRange);
+                    
+                    // 4. 다음 파동 시간 예약
+                    nextRippleTime = Time.time + 0.2f; 
                 }
             }
         }
-
         private void OnLand(AnimationEvent animationEvent)
         {
             if (animationEvent.animatorClipInfo.weight > 0.5f)

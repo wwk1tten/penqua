@@ -22,14 +22,15 @@ public class SoundVisualManager : MonoBehaviour
     {
         if (rippleParticle == null) return;
 
+        if (!rippleParticle.isPlaying) rippleParticle.Play();
         // 파티클 1개를 발사하기 위한 설정(Params) 만들기
         var emitParams = new ParticleSystem.EmitParams();
 
         // 1. 위치: 바닥(y)보다 아주 살짝 위에 (겹침 방지)
-        emitParams.position = position + Vector3.up * 0.05f;
+        emitParams.position = Vector3.zero + Vector3.up * 0.1f;
 
         // 2. 크기: 지름 = 반지름(range) * 2
-        emitParams.startSize = range * 2f;
+        emitParams.startSize = range * 10f;
 
         // 3. 색상: 뛰면 노랑, 걸으면 파랑
         emitParams.startColor = isRunning ? runColor : walkColor;

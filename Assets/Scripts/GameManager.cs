@@ -77,6 +77,7 @@ public class GameManager : MonoBehaviour
 
     public void GameClear(){
         if (ClearPanel != null) ClearPanel.SetActive(true);
+        Time.timeScale = 0f;
     }
 
     public void UpdateVignette(int currentHealth, int maxHealth)

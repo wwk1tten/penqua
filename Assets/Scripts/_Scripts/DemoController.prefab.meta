@@ -7,8 +7,8 @@ PrefabImporter:
   assetBundleVariant: 
 AssetOrigin:
   serializedVersion: 1
-  productId: 178235
-  packageName: Free Animals - Quirky Series
-  packageVersion: 1.4
-  assetPath: Assets/Quirky Series Ultimate/_Scripts/DemoController.prefab
-  uploadId: 580081
+  productId: 149267
+  packageName: Penguin - Quirky Series
+  packageVersion: 1.4.1
+  assetPath: Assets/Scripts/_Scripts/DemoController.prefab
+  uploadId: 752931
