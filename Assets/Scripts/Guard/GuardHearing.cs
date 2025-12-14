@@ -14,11 +14,11 @@ public class GuardHearing : MonoBehaviour
         }
     }
     
-    public void OnSoundHeard(Vector3 soundPosition)
+    public void OnSoundHeard(Vector3 soundPosition, float soundRadius)
     {
         if (guardPatrol != null)
         {
-            guardPatrol.OnSoundHeard(soundPosition);
+            guardPatrol.OnSoundHeard(soundPosition, soundRadius);
         }
     }
 }

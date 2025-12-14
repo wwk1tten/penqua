@@ -66,27 +66,46 @@ public class AISensor : MonoBehaviour
 
     public bool IsInSight(GameObject obj)
     {
+        // 경비원 눈 위치
         Vector3 origin = transform.position + Vector3.up * (height / 2f);
-        Vector3 dest = obj.transform.position + Vector3.up * (height / 2f);
-        Vector3 direction = dest - origin;
         
-        // 1. 높이 체크
-        float heightDiff = Mathf.Abs(direction.y);
-        if (heightDiff > height / 2f) 
+        // 체크할 타겟의 포인트들 (중심, 머리, 좌, 우)
+        List<Vector3> targetPoints = new List<Vector3>();
+        
+        // 1. 중심 (기존)
+        targetPoints.Add(obj.transform.position + Vector3.up * (height / 2f)); 
+        
+        // 2. 머리 위 (높이 판정 보완)
+        // (CharacterController가 있다면 height나 radius를 가져오면 더 정확함)
+        targetPoints.Add(obj.transform.position + Vector3.up * (height * 0.9f));
+
+        // 3. 좌우 어깨 (폭 판정 보완 - 엉덩이 튀어나옴 감지용)
+        Vector3 right = obj.transform.right * 0.3f; // 펭귄 너비의 절반 정도
+        targetPoints.Add(obj.transform.position + Vector3.up * (height / 2f) + right);
+        targetPoints.Add(obj.transform.position + Vector3.up * (height / 2f) - right);
+
+        // 포인트 중 하나라도 보이면 "본 것"으로 처리
+        foreach (var dest in targetPoints)
         {
-            return false;
+            Vector3 direction = dest - origin;
+            
+            // 거리 체크 (OverlapSphere에서 했지만 확실히)
+            if (direction.magnitude > distance) continue;
+
+            // 각도 체크
+            Vector3 flatDirection = new Vector3(direction.x, 0, direction.z).normalized;
+            float deltaAngle = Vector3.Angle(flatDirection, transform.forward);
+            if (deltaAngle > angle / 2f) continue;
+
+            // 장애물(벽) 체크
+            // Linecast가 true면 벽에 막힌 것 -> false면 뚫린 것(보임)
+            if (!Physics.Linecast(origin, dest, occlusionLayers)) 
+            {
+                return true; // 하나라도 통과하면 발견!
+            }
         }
-
-        // 2. 각도 체크
-        Vector3 flatDirection = new Vector3(direction.x, 0, direction.z).normalized;
-        float deltaAngle = Vector3.Angle(flatDirection, transform.forward);
         
-        if (deltaAngle > angle / 2f) return false;
-
-        // 3. 장애물 체크
-        if(Physics.Linecast(origin, dest, occlusionLayers)) return false;
-        
-        return true;
+        return false; // 모든 포인트가 안 보임
     }
 
     Mesh CreateWedgeMesh()

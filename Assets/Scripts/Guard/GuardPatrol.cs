@@ -12,21 +12,28 @@ public class GuardPatrol : MonoBehaviour
 
     [Header("State")]
     public GuardState currentState = GuardState.Patrol;
-    public float alertTimeout = 5f;
+    public float alertTimeout = 0.5f;
 
     [Header("Patrol Settings")]
     public Transform[] waypoints;
     public float patrolSpeed = 3.5f;
-    public float chaseSpeed = 5f; // [수정] 오타 방지를 위해 순서 정리
+    public float chaseSpeed = 5f;
+    public float searchSpeed = 2.0f;
     public float waypointReachedDistance = 1.0f;
     public float waitTime = 2.0f;
+
+    [Header("Search Settings")]
+    public float searchDuration = 4.0f; // 놓치고 나서 두리번거리는 시간
+    private float searchTimer = 0f;
+    private bool isSearching = false;
 
     [Header("Alert Settings")]
     public float alertSpeed = 2f;
 
     [Header("Detection")]
-    public float visionRange = 15f; // Gizmo용
     public float hearingRange = 10f;
+    [Range(0.5f, 2.0f)]
+    public float hearingSensitivity = 1.0f;
     
     [Header("Attack")]
     public float attackRange = 1.5f; 
@@ -45,7 +52,8 @@ public class GuardPatrol : MonoBehaviour
     private NavMeshAgent agent;
     private AISensor sensor;
     private Animator animator;
-    private GuardIcon guardIcon;
+    private GuardIcon alertIcon;
+    private GuardIcon susIcon;    
     private Transform playerTarget = null;
     
     private int currentWaypointIndex = 0;
@@ -67,6 +75,7 @@ public class GuardPatrol : MonoBehaviour
     private int _animIDHit;
     private int _animIDAlert;
     private int _animIDAttack;
+    private int _animIDSearch;
 
     // =========================================================
     // 2. 초기화 (Start)
@@ -76,7 +85,8 @@ public class GuardPatrol : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         sensor = GetComponent<AISensor>();
         animator = GetComponent<Animator>();
-        guardIcon = GetComponent<GuardIcon>();
+        alertIcon = GetComponent<GuardIcon>();
+        susIcon = GetComponent<GuardIcon>();
 
         // 속도 백업
         basePatrolSpeed = patrolSpeed;
@@ -88,9 +98,12 @@ public class GuardPatrol : MonoBehaviour
         _animIDHit = Animator.StringToHash("Hit");
         _animIDAlert = Animator.StringToHash("isAlert");
         _animIDAttack = Animator.StringToHash("Attack");
+        _animIDSearch = Animator.StringToHash("isSearching");
 
         agent.speed = patrolSpeed;
-        guardIcon.SetAlert(false);
+        alertIcon.SetAlert(false);
+        susIcon.SetAlert(false);
+
 
         // 플레이어 찾기
         if (playerTarget == null)
@@ -188,21 +201,12 @@ public class GuardPatrol : MonoBehaviour
     void DetectPlayer()
     {
         if (sensor == null) return;
-        
-        // 센서가 감지한 물체들 중 플레이어가 있는지 확인
-        if (sensor.Objects.Count > 0)
+        if (sensor.IsInSight(playerTarget.gameObject))
         {
-            foreach (var obj in sensor.Objects)
+            // 발견! -> 이미 추격 중이 아니면 Alert 발동
+            if (currentState != GuardState.Chase && currentState != GuardState.Alert)
             {
-                if (obj != null && obj.CompareTag("Player"))
-                {
-                    playerTarget = obj.transform;
-                    if (currentState != GuardState.Alert && currentState != GuardState.Chase)
-                    {
-                        ChangeState(GuardState.Alert);
-                    }
-                    return;
-                }
+                ChangeState(GuardState.Alert);
             }
         }
     }
@@ -234,75 +238,78 @@ public class GuardPatrol : MonoBehaviour
 
     void UpdateAlert()
     {
-        guardIcon.SetAlert(true);
-
-        if (playerTarget != null) agent.destination = playerTarget.position;
-
+        // 발견 후 잠깐 멈칫했다가 추격
         alertTimer -= Time.deltaTime;
-        if (alertTimer <= 0.5f) // 약간의 딜레이 후 추격
-        {
-            ChangeState(GuardState.Chase);
-        }
+        if (alertTimer <= 0.5f) ChangeState(GuardState.Chase);
+        
+        // Alert 상태에서도 계속 플레이어를 바라보게 하면 좋음
+        Vector3 dir = (playerTarget.position - transform.position).normalized;
+        dir.y = 0;
+        if(dir != Vector3.zero) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * 5f);
     }
 
     void UpdateChase()
     {
-        guardIcon.SetAlert(true);
-
-        if (playerTarget == null)
+        // 1. 플레이어를 놓쳤는지 확인 (센서 시야에서 사라짐)
+        if (sensor != null && !sensor.IsInSight(playerTarget.gameObject))
         {
-            ChangeState(GuardState.Return);
+            // 바로 돌아가는 게 아니라, '마지막 위치'를 수색하러 감
+            ChangeState(GuardState.Suspicious);
             return;
         }
 
-        float dist = Vector3.Distance(transform.position, playerTarget.position);
+        // 2. 추격 로직
+        lastKnownPosition = playerTarget.position; // 계속 위치 갱신
+        agent.SetDestination(lastKnownPosition);
 
-        // 사거리 진입 시: 이동 멈추고 회전만 함 (공격은 CheckAndAttack에서 처리)
+        // 사거리 안이면 멈춰서 공격 준비 (회전)
+        float dist = Vector3.Distance(transform.position, playerTarget.position);
         if (dist <= attackRange)
         {
             agent.isStopped = true;
-            agent.velocity = Vector3.zero;
-            agent.ResetPath();
-            agent.updateRotation = false; // 수동 회전
-
             Vector3 dir = (playerTarget.position - transform.position).normalized;
             dir.y = 0;
-            if (dir != Vector3.zero)
-            {
-                Quaternion targetRot = Quaternion.LookRotation(dir);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
-            }
+            if (dir != Vector3.zero) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * 10f);
         }
-        else // 사거리 밖: 추격 이동
+        else
         {
-            agent.updateRotation = true;
-            if (agent.isStopped) agent.isStopped = false;
-            
-            agent.SetDestination(playerTarget.position);
-            lastKnownPosition = playerTarget.position;
-        }
-
-        // 시야에서 사라졌을 때
-        if (sensor != null && sensor.Objects.Count == 0)
-        {
-            agent.updateRotation = true;
             agent.isStopped = false;
-            ChangeState(GuardState.Return);
         }
     }
 
     void UpdateSuspicious()
-    {
-        guardIcon.SetAlert(true);
-        if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
+    {        
+        // 1. 목적지(소리 난 곳 or 마지막 목격지)로 이동 중
+        if (!isSearching)
         {
-            ChangeState(GuardState.Return);
+            agent.SetDestination(lastKnownPosition);
+
+            // 목적지 도착 체크
+            if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
+            {
+                // 도착했으면 수색 시작 (두리번)
+                isSearching = true;
+                searchTimer = searchDuration;
+                agent.isStopped = true; // 멈춤
+                if(animator) animator.SetBool(_animIDSearch, true); // 두리번 애니메이션
+            }
+        }
+        // 2. 도착 후 제자리 수색 중
+        else
+        {
+            searchTimer -= Time.deltaTime;
+            
+            // 수색 시간 끝 -> 아무도 없음 -> 복귀
+            if (searchTimer <= 0)
+            {
+                if(animator) animator.SetBool(_animIDSearch, false);
+                ChangeState(GuardState.Return);
+            }
         }
     }
 
     void UpdateReturn()
     {
-        guardIcon.SetAlert(false);
         if (!agent.pathPending && agent.remainingDistance <= waypointReachedDistance)
         {
             ChangeState(GuardState.Patrol);
@@ -316,48 +323,49 @@ public class GuardPatrol : MonoBehaviour
     void ChangeState(GuardState newState)
     {
         if (currentState == newState) return;
+        
+        // 이전 상태 정리
+        if(animator) animator.SetBool(_animIDSearch, false);
+        if(animator) animator.SetBool(_animIDAlert, false);
+
         currentState = newState;
-
-        // 상태 변경 시 공통 초기화
-        agent.updateRotation = true;
         agent.isStopped = false;
-
-        // 속도 적용 (젖음 고려는 UpdateSpeedByWetness에서 매 프레임 처리됨)
-        float baseSpeed = patrolSpeed; 
 
         switch (newState)
         {
             case GuardState.Patrol:
-                baseSpeed = basePatrolSpeed;
-                isWaiting = false;
+                agent.speed = patrolSpeed;
                 SetDestination();
-                if (animator) animator.SetBool(_animIDAlert, false);
                 break;
 
             case GuardState.Suspicious:
-                baseSpeed = basePatrolSpeed;
-                isWaiting = false;
-                if (animator) animator.SetBool(_animIDAlert, true);
+                alertIcon.SetAlert(false);
+                susIcon.SetSus(true);
+                agent.speed = searchSpeed; // 천천히 다가감 (긴장감)
+                isSearching = false;       // 이동부터 시작
+                agent.SetDestination(lastKnownPosition);
                 break;
 
-            case GuardState.Alert:
-                baseSpeed = baseAlertSpeed;
+            case GuardState.Alert: // 발견 순간
+                alertIcon.SetAlert(true);
+                susIcon.SetSus(false);
+                agent.speed = 0; // 잠깐 멈칫
                 alertTimer = alertTimeout;
-                isWaiting = false;
-                if (animator) animator.SetBool(_animIDAlert, true);
+                if(animator) animator.SetBool(_animIDAlert, true);
                 break;
 
             case GuardState.Chase:
-                baseSpeed = baseChaseSpeed;
-                isWaiting = false;
-                if (animator) animator.SetBool(_animIDAlert, true);
+                alertIcon.SetAlert(true);
+                susIcon.SetSus(false);
+                agent.speed = chaseSpeed; // 전력 질주
+                if(animator) animator.SetBool(_animIDAlert, true); // 추격 모션
                 break;
 
             case GuardState.Return:
-                baseSpeed = basePatrolSpeed;
-                isWaiting = false;
+                alertIcon.SetAlert(false);
+                susIcon.SetSus(false);
+                agent.speed = patrolSpeed;
                 MoveToClosestWaypoint();
-                if (animator) animator.SetBool(_animIDAlert, false);
                 break;
         }
     }
@@ -460,14 +468,33 @@ public class GuardPatrol : MonoBehaviour
     }
 
     // 소리 듣기 이벤트
-    public void OnSoundHeard(Vector3 soundPosition)
+    public void OnSoundHeard(Vector3 soundPosition, float soundRadius)
     {
+        // 이미 추격 중이거나 경계 중이면 소리 무시 (시각 정보가 더 중요함)
+        if (currentState == GuardState.Chase || currentState == GuardState.Alert) return;
+
         float distance = Vector3.Distance(transform.position, soundPosition);
-        if (distance <= hearingRange && currentState == GuardState.Patrol)
+        
+        // 내가 들을 수 있는 유효 거리 = 소리 크기(Radius) * 내 귀 밝기(Sensitivity)
+        float effectiveHearingDistance = soundRadius * hearingSensitivity;
+
+        // 소리가 들리면 -> 그 위치를 '의심'하고 조사하러 감
+        if (distance <= hearingRange)
         {
-            lastKnownPosition = soundPosition;
-            agent.SetDestination(soundPosition);
-            ChangeState(GuardState.Suspicious);
+            lastKnownPosition = soundPosition; // 가야 할 곳 설정
+            
+            // 패트롤 중에 들었다면 -> Suspicious로 전환
+            if (currentState == GuardState.Patrol || currentState == GuardState.Return)
+            {
+                ChangeState(GuardState.Suspicious);
+            }
+            // 이미 Suspicious 상태라면? -> 새로운 소리 위치로 목표 갱신
+            else if (currentState == GuardState.Suspicious)
+            {
+                isSearching = false; // 다시 이동 모드로
+                agent.isStopped = false;
+                agent.SetDestination(lastKnownPosition);
+            }
         }
     }
 
@@ -528,8 +555,6 @@ public class GuardPatrol : MonoBehaviour
     {
         Gizmos.color = new Color(0f, 0.5f, 1f, 0.5f);
         Gizmos.DrawWireSphere(transform.position, hearingRange);
-        
-        Gizmos.color = new Color(1f, 1f, 0f, 0.2f);
-        Gizmos.DrawWireSphere(transform.position, visionRange);
+
     }
 }
