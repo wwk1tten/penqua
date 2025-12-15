@@ -5,7 +5,8 @@ public class SoundVisualManager : MonoBehaviour
     public static SoundVisualManager Instance;
 
     [Header("파티클 연결")]
-    public ParticleSystem rippleParticle; // 아까 만든 VFX_SoundRipples
+    public ParticleSystem rippleParticle;
+    public ParticleSystem waterBubble;
 
     [Header("색상 설정")]
     public Color walkColor = new Color(0f, 1f, 1f, 0.5f); // 걷기: 청록색
@@ -18,24 +19,41 @@ public class SoundVisualManager : MonoBehaviour
 
     /// <param name="range">소리 범위 (반지름)</param>
     /// <param name="isRunning">뛰는 중인가?</param>
-    public void SpawnRipple(Vector3 position, float range, bool isRunning)
+    public void SpawnRipple(Vector3 position, float range, bool isRunning, bool isSwimming)
     {
-        if (rippleParticle == null) return;
+        ParticleSystem targetSystem = isSwimming ? waterBubble : rippleParticle;
+        
+        if (targetSystem == null) {
+            return;
+        }
 
-        if (!rippleParticle.isPlaying) rippleParticle.Play();
+        if (!targetSystem.isPlaying) {
+            targetSystem.Play();
+        }
+
         // 파티클 1개를 발사하기 위한 설정(Params) 만들기
         var emitParams = new ParticleSystem.EmitParams();
 
-        // 1. 위치: 바닥(y)보다 아주 살짝 위에 (겹침 방지)
-        emitParams.position = Vector3.zero + Vector3.up * 0.1f;
+        if (isSwimming)
+        {
+            // 수중: 펭귄 몸통 중심(배꼽)에서 퍼져야 함 -> position 그대로 쓰거나 살짝 위
+            //emitParams.position = position + Vector3.up * 0.5f; 
+            emitParams.position = Vector3.up * 0.5f;
+            emitParams.startSize = range * 5.0f; // 구체는 지름이 곧 크기
+        }
+        else
+        {
+            // 지상: 바닥에 깔려야 함 -> 바닥 좌표(y=0 근처)로 보정
+            //emitParams.position = new Vector3(position.x, position.y + 0.05f, position.z);
+            emitParams.position = Vector3.up * 0.05f;
+            emitParams.startSize = range * 10f;
+        }
 
-        // 2. 크기: 지름 = 반지름(range) * 2
-        emitParams.startSize = range * 10f;
-
-        // 3. 색상: 뛰면 노랑, 걸으면 파랑
+        
         emitParams.startColor = isRunning ? runColor : walkColor;
 
-        // 4. 발사! (1개)
-        rippleParticle.Emit(emitParams, 1);
+        // 발사
+        Debug.Log($"[Emit] 발사! 위치: {emitParams.position}, 크기: {emitParams.startSize}");
+        targetSystem.Emit(emitParams, 1);
     }
 }

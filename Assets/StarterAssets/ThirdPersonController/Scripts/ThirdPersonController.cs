@@ -112,15 +112,8 @@ namespace StarterAssets
         [Tooltip("How fast the character rotates to face the camera direction while aiming.")]
         public float AimRotationSpeed = 20f;
         private bool _isAiming;
-        [Header("Capsule")]
-        public int inventorySize = 3;
-        public List<Image> inventorySlots; // UI 슬롯 이미지들을 담을 리스트
-        public Color selectedSlotColor = Color.yellow; // 선택된 슬롯 테두리 색
-        public Color defaultSlotColor = Color.white;   // 기본 슬롯 테두리 색
         
-        // [변경점 1] 인벤토리 타입 변경
-        private List<CapsuleData> inventory = new List<CapsuleData>();
-        private int currentInventoryIndex = -1;
+        private List<CapsuleData> collectedCapsules = new List<CapsuleData>();
         private Camera mainCamera;
     
 
@@ -173,6 +166,7 @@ namespace StarterAssets
         private const float _threshold = 0.01f;
         private bool _isCrouching = false;
         private bool _isOnPuddle = false;
+        private bool _canReleaseAnimal = false;
         private bool _hasAnimator;
         private bool IsCurrentDeviceMouse
         {
@@ -209,7 +203,6 @@ namespace StarterAssets
 #endif
 
             AssignAnimationIDs();
-            UpdateInventoryUI();
 
             // reset our timeouts on start
             _jumpTimeoutDelta = JumpTimeout;
@@ -235,7 +228,6 @@ namespace StarterAssets
                 return; // 조작 불가
             }
 
-            Inventory();
             HandleCrouchInput();
             HandleAiming(); 
             JumpAndGravity();
@@ -245,6 +237,10 @@ namespace StarterAssets
             // 수영 상태 Animator 업데이트
             if (_hasAnimator){
                 _animator.SetBool(_animIDIsSwimming, _isSwimming);
+            }
+
+            if (_canReleaseAnimal && Input.GetKeyDown(KeyCode.Q)) {
+                ActivateCapsule(transform.position);
             }
         }
 
@@ -597,68 +593,32 @@ namespace StarterAssets
                 _animator.SetBool(_animIDIsCrouching, _isCrouching);
             }
         }
-        private void Inventory()
-        {
-            if (Input.GetKeyDown(KeyCode.Q) && currentInventoryIndex != -1)
-            {
-                Ray ray = mainCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
-                if (Physics.Raycast(ray, out RaycastHit hit, 50f))
-                {
-                    if (hit.collider.CompareTag("WaterSource")) ActivateCapsule(hit.point);
-                }
-            }
 
-            float scroll = Input.GetAxis("Mouse ScrollWheel");
-            if (scroll != 0f && inventory.Count > 0)
-            {
-                currentInventoryIndex += (scroll > 0f) ? 1 : -1;
-                if (currentInventoryIndex >= inventory.Count) currentInventoryIndex = 0;
-                if (currentInventoryIndex < 0) currentInventoryIndex = inventory.Count - 1;
-                
-                UpdateInventoryUI(); // 아이템 선택 변경 시 UI 업데이트
-            }
-        }
-    
         void ActivateCapsule(Vector3 activationPoint)
         {
-            CapsuleData capsuleToActivate = inventory[currentInventoryIndex];
-            
-            if (capsuleToActivate.animalPrefab != null)
+            // 1. 가진 캡슐이 없으면 실패
+            if (collectedCapsules.Count == 0)
             {
-                Instantiate(capsuleToActivate.animalPrefab, activationPoint, Quaternion.identity);
+                Debug.Log("해방할 캡슐이 없습니다!");
+                return;
             }
-            
-            GameManager.Instance.OnCapsuleCollected(capsuleToActivate.capsuleID);
-            
-            inventory.RemoveAt(currentInventoryIndex);
-            
-            currentInventoryIndex = (inventory.Count > 0) ? 0 : -1;
-            UpdateInventoryUI();
-        }
-        
-        void UpdateInventoryUI()
-        {
-            for (int i = 0; i < inventorySlots.Count; i++)
+
+            // 2. 가장 먼저 먹은 캡슐 꺼내기 (FIFO)
+            CapsuleData capsuleToRelease = collectedCapsules[0];
+
+            // 3. 동물 소환
+            if (capsuleToRelease.animalPrefab != null)
             {
-                // 인벤토리에 아이템이 있는 경우
-                if (i < inventory.Count)
-                {
-                    inventorySlots[i].sprite = inventory[i].capsuleIcon;
-                    inventorySlots[i].color = new Color(1, 1, 1, 1); // 보이게
-                }
-                else // 빈 슬롯인 경우
-                {
-                    inventorySlots[i].sprite = null;
-                    inventorySlots[i].color = new Color(1, 1, 1, 0.5f); // 반투명하게
-                }
-                
-                // 현재 선택된 슬롯 테두리 강조
-                Image slotBorder = inventorySlots[i].transform.parent.GetComponent<Image>();
-                if (slotBorder != null)
-                {
-                    slotBorder.color = (i == currentInventoryIndex) ? selectedSlotColor : defaultSlotColor;
-                }
+                // activationPoint는 보통 플레이어 앞이나 지정된 위치
+                Instantiate(capsuleToRelease.animalPrefab, activationPoint, Quaternion.identity);
             }
+
+            // 4. [핵심 변경] "수집"이 아니라 "방생" 함수를 호출!
+            // (이미 먹을 때 불은 켜졌고, 여기서는 방생 카운트를 올려서 탈출 조건을 체크함)
+            GameManager.Instance.OnAnimalReleased();
+
+            // 5. 리스트에서 제거 (사용했으니 삭제)
+            collectedCapsules.RemoveAt(0);
         }
         private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
         {
@@ -682,12 +642,19 @@ namespace StarterAssets
         }
 
         private void OnFootstep(AnimationEvent animationEvent){
+            float noiseRange = 3.0f; // 기본 걷기 범위
+            
             if (_isCrouching) return; 
-
+            
+            if (_isSwimming) {
+                SoundEmitter.MakeSound(transform.position, noiseRange, true);
+                return;
+            }
+            
             if (animationEvent.animatorClipInfo.weight > 0.5f)
             {
                 float currentSpeed = _controller.velocity.magnitude; // 현재 실제 이동 속도
-                float noiseRange = 3.0f; // 기본 걷기 범위
+                
                 if (FootstepAudioClips.Length > 0)
                 {
                     var index = Random.Range(0, FootstepAudioClips.Length);
@@ -702,7 +669,7 @@ namespace StarterAssets
                 if (Time.time >= nextRippleTime)
                 {
                     // 3. 감지 로직 실행
-                    SoundEmitter.MakeSound(transform.position, noiseRange);
+                    SoundEmitter.MakeSound(transform.position, noiseRange, false);
                     
                     // 4. 다음 파동 시간 예약
                     nextRippleTime = Time.time + 0.2f; 
@@ -723,6 +690,7 @@ namespace StarterAssets
             {
                 _isSwimming = true;
                 _animator.SetBool("isSwimming", _isSwimming);
+                _canReleaseAnimal = true;
             }
 
             else if (other.CompareTag("WaterPuddle") && !isStunned)
@@ -746,21 +714,20 @@ namespace StarterAssets
 
             else if (other.TryGetComponent<CapsuleController>(out CapsuleController capsule))
             {
-                if (inventory.Count < inventorySize)
+                // 캡슐 데이터 생성 및 리스트에 저장 (주머니에 넣기)
+                CapsuleData newData = new CapsuleData
                 {
-                    // [변경점 2] 오브젝트가 아닌 '데이터'를 생성하여 인벤토리에 추가
-                    CapsuleData newData = new CapsuleData
-                    {
-                        capsuleID = capsule.capsuleID,
-                        animalPrefab = capsule.animalPrefab,
-                        capsuleIcon = capsule.capsuleIcon
-                    };
-                    inventory.Add(newData);
+                    capsuleID = capsule.capsuleID,
+                    animalPrefab = capsule.animalPrefab, // 나중에 소환할 프리팹 정보 저장
+                    capsuleIcon = capsule.capsuleIcon
+                };
+                collectedCapsules.Add(newData);
 
-                    currentInventoryIndex = inventory.Count - 1;
-                    Destroy(capsule.gameObject);
-                    UpdateInventoryUI(); // 아이템 획득 시 UI 업데이트
-                }
+                // 먹자마자 게임 매니저에 알림 (비상구 불 켜기 등)
+                GameManager.Instance.OnCapsuleCollected(capsule.capsuleID);
+
+                // 캡슐 오브젝트 파괴
+                Destroy(capsule.gameObject);
             }
         }
 
@@ -769,6 +736,7 @@ namespace StarterAssets
             if ((waterMask & (1 << other.gameObject.layer)) != 0)
             {
                 _isSwimming = false;
+                _canReleaseAnimal = false;
             }
 
             else if (other.CompareTag("WaterPuddle"))

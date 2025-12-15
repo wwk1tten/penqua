@@ -5,6 +5,8 @@ public class ExitDoorController : MonoBehaviour
     [Header("전구 설정 (0, 1, 2 순서대로)")]
     public GameObject[] redLights;   // 빨간불 오브젝트 3개
     public GameObject[] greenLights; // 초록불 오브젝트 3개
+    public GameObject[] redCones;   // 빨간조명 오브젝트 3개
+    public GameObject[] greenCones; // 초록조명 오브젝트 3개
 
     [Header("문 설정")]
     public GameObject doorObject;    // 열릴 문 오브젝트
@@ -34,12 +36,17 @@ public class ExitDoorController : MonoBehaviour
                     audioSource.PlayOneShot(lightOnSound);
 
                 redLights[i].SetActive(false);
+                redCones[i].SetActive(false);
                 greenLights[i].SetActive(true);
+                greenCones[i].SetActive(true);
             }
             else
             {
                 redLights[i].SetActive(true);
+                redCones[i].SetActive(true);
                 greenLights[i].SetActive(false);
+                greenCones[i].SetActive(false);
+
             }
         }
 

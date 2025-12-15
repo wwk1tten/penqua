@@ -2,13 +2,13 @@ using UnityEngine;
 
 public class SoundEmitter : MonoBehaviour
 {
-    public static void MakeSound(Vector3 position, float range)
+    public static void MakeSound(Vector3 position, float range, bool isSwimming = false)
     {
         // 1. 시각 효과 (기존 코드 유지)
         if (SoundVisualManager.Instance != null)
         {
             bool isRunning = range > 4.0f; 
-            SoundVisualManager.Instance.SpawnRipple(position, range, isRunning);
+            SoundVisualManager.Instance.SpawnRipple(position, range, isRunning, isSwimming);
         }
 
         // 2. 논리 판정

@@ -41,8 +41,6 @@ public class EscapeZone : MonoBehaviour
                 int remaining = totalGoals - current;
 
                 Debug.Log($"아직 {remaining}명의 친구가 갇혀있어!");
-                
-                GameManager.Instance.ShowInventoryStatus();
             }
         }
     }

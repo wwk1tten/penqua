@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: VolumetricCone
+  m_Name: VolumetricCone 1
   m_Shader: {fileID: 4800000, guid: 0406db5a14f94604a8c57ccfbc9f3b46, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -73,11 +73,11 @@ Material:
     - _Surface: 1
     - _ZWrite: 0
     m_Colors:
-    - _BaseColor: {r: 1, g: 0.5990566, b: 0.5990566, a: 0.68235296}
+    - _BaseColor: {r: 0, g: 0.6981132, b: 0.29824466, a: 0.68235296}
     - _BaseColorAddSubDiff: {r: 1, g: 0, b: 0, a: 0}
     - _CameraFadeParams: {r: 0, g: Infinity, b: 0, a: 0}
-    - _Color: {r: 1, g: 0.5990566, b: 0.5990566, a: 0.68235296}
-    - _EmissionColor: {r: 7.5950727, g: 1.4688582, b: 1.4688582, a: 1}
+    - _Color: {r: 0, g: 0.6981132, b: 0.29824463, a: 0.68235296}
+    - _EmissionColor: {r: 1.4712967, g: 7.5950737, b: 2.862562, a: 1}
     - _SoftParticleFadeParams: {r: 0.06, g: 0.5208333, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

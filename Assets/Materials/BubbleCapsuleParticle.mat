@@ -20,17 +20,15 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: BubbleParticle
+  m_Name: BubbleCapsuleParticle
   m_Shader: {fileID: 4800000, guid: 0406db5a14f94604a8c57ccfbc9f3b46, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _COLORADDSUBDIFF_ON
-  - _EMISSION
   - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords:
   - _FLIPBOOKBLENDING_OFF
-  m_LightmapFlags: 2
+  m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: 3002
@@ -44,7 +42,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 6723a8bab2ff0b24c9ec2939b5424bba, type: 3}
+        m_Texture: {fileID: 2800000, guid: 34590962a382f4a6987fa3e54af71814, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -137,7 +135,7 @@ Material:
     - _CausticsSpeed: 0.1
     - _CausticsTiling: 0.5
     - _ColorAbsorption: 0
-    - _ColorMode: 1
+    - _ColorMode: 0
     - _Cull: 2
     - _Cutoff: 0.5
     - _Density_Multiplier: 0.964
@@ -280,14 +278,14 @@ Material:
     - _ZWrite: 0
     - _ZWriteControl: 0
     m_Colors:
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 0.44705883}
-    - _BaseColorAddSubDiff: {r: 1, g: 0, b: 0, a: 0}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
     - _CameraFadeParams: {r: 0, g: Infinity, b: 0, a: 0}
-    - _Color: {r: 1, g: 1, b: 1, a: 0.44705883}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _Direction: {r: 0, g: -1, b: 0, a: 0}
     - _DistanceFoamFadeDist: {r: 100, g: 350, b: 0, a: 0}
     - _DistanceNormalsFadeDist: {r: 100, g: 300, b: 0, a: 0}
-    - _EmissionColor: {r: 2, g: 2, b: 2, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
     - _FoamCrestMinMaxHeight: {r: 1, g: 2, b: 0, a: 0}
     - _FoamTiling: {r: 0.1, g: 0.1, b: 0, a: 0}

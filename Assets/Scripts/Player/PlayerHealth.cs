@@ -24,7 +24,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private CharacterController charController; // Rigidbody 대신 이거 사용
     
     private Animator animator;
-    private CheckPointManager checkpointManager;
 
     [Header("Events")]
     public UnityEvent<int> OnHealthChanged;
@@ -35,7 +34,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // Rigidbody 삭제, CharacterController 가져오기
         charController = GetComponent<CharacterController>();
         animator = GetComponentInChildren<Animator>();
-        checkpointManager = GetComponent<CheckPointManager>();
 
         // 만약 못 찾으면 콘솔에 경고 띄우기
         if(movementScript == null) 
@@ -73,8 +71,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         Debug.Log($"아야! 남은 체력: {currentHealth}");
 
-        // ✅ 변경: 하트 업데이트 대신 비네팅 및 플래시 효과 호출
-        // (싱글톤 패턴을 쓴다고 가정: GameManager.Instance)
+        // 비네팅 및 플래시 효과 호출
         if (GameManager.Instance != null)
         {
             // 1. 지속적인 데미지 효과 (금 간 화면) 업데이트
@@ -153,8 +150,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     IEnumerator RespawnRoutine()
     {
-        // 4. 누워있는 시간 동안 대기
-        // (애니메이터 설정을 고쳤다면, 이 시간 동안 캐릭터는 바닥에 누운 채로 멈춰 있습니다)
         yield return new WaitForSeconds(stunDuration);
 
         // 5. 체크포인트로 순간이동 (CharacterController가 꺼진 상태여야 안전하게 이동됨)
@@ -166,6 +161,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // 한 프레임 대기 (위치 반영 확실하게 하기 위해)
         yield return null; 
 
+        if (CheckPointManager.Instance != null) {
+            transform.position = CheckPointManager.Instance.GetRespawnPosition();
+        }
+
         // 6. 컴포넌트 다시 켜기
         if (charController != null) charController.enabled = true;
         if (movementScript != null) movementScript.enabled = true;
@@ -174,6 +173,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         currentHealth = maxHealth;
         isStunned = false;
         OnHealthChanged?.Invoke(currentHealth);
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.UpdateVignette(currentHealth, maxHealth);
+        }
 
         // 🌟 핵심: 이제 일어나라고 알림! (1단계에서 만든 Trigger)
         if (animator) animator.SetTrigger("Respawn"); 
