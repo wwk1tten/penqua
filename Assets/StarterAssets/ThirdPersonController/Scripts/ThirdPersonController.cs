@@ -45,7 +45,11 @@ namespace StarterAssets
 
         public AudioClip LandingAudioClip;
         public AudioClip[] FootstepAudioClips;
+        public AudioClip[] SwimAudioClips; 
         [Range(0, 1)] public float FootstepAudioVolume = 0.5f;
+        public float SwimAudioVolume = 0.5f;
+        private float nextSwimRippleTime = 0f; // 수영 파동 쿨타임용
+        public float swimRippleRate = 0.5f;
 
         [Space(10)]
         [Tooltip("The height the player can jump")]
@@ -96,6 +100,7 @@ namespace StarterAssets
         [SerializeField] private LayerMask waterMask;
         [Tooltip("Swim speed of the character in m/s")]
         public float swimSpeed = 0.5f;
+        public ParticleSystem bubbleTrailEffect;
         [Tooltip("Gravity in water (should be less negative than normal gravity)")]
         public float swimGravity = -5.0f;  // -15보다 약함
         private bool _isSwimming = false;
@@ -232,6 +237,7 @@ namespace StarterAssets
             HandleAiming(); 
             JumpAndGravity();
             GroundedCheck();
+            HandleBubbleTrail();
             Move();
 
             // 수영 상태 Animator 업데이트
@@ -451,6 +457,23 @@ namespace StarterAssets
                     _animator.SetFloat(_animIDSpeed, _animationBlend);
                     _animator.SetFloat(_animIDMotionSpeed, 1f); // 수영은 모션 속도 일정하게
                 }
+
+                // 움직이고 있을 때만 소리/파동 발생
+                if (_input.move != Vector2.zero)
+                {
+                    if (Time.time >= nextSwimRippleTime)
+                    {
+                        // 1. [신규] 물소리 재생! (발자국 소리 아님)
+                        PlaySwimSound(); 
+
+                        // 2. 파티클 및 감지 (기존 코드)
+                        float swimNoise = (_input.sprint) ? 6.0f : 3.0f;
+                        SoundEmitter.MakeSound(transform.position, swimNoise, true); // true = 수영모드
+
+                        // 3. 쿨타임 갱신 (0.5초마다 첨벙!)
+                        nextSwimRippleTime = Time.time + swimRippleRate;
+                    }
+                }
             }
             else {
                 targetSpeed = _isCrouching ? CrouchingSpeed : (_input.sprint ? SprintSpeed : MoveSpeed);
@@ -647,7 +670,6 @@ namespace StarterAssets
             if (_isCrouching) return; 
             
             if (_isSwimming) {
-                SoundEmitter.MakeSound(transform.position, noiseRange, true);
                 return;
             }
             
@@ -683,7 +705,35 @@ namespace StarterAssets
                 AudioSource.PlayClipAtPoint(LandingAudioClip, transform.TransformPoint(_controller.center), FootstepAudioVolume);
             }
         }
-        
+        private void PlaySwimSound()
+        {
+            if (SwimAudioClips.Length > 0)
+            {
+                var index = Random.Range(0, SwimAudioClips.Length);
+                // 플레이어 위치에서 물소리 재생
+                AudioSource.PlayClipAtPoint(SwimAudioClips[index], transform.position, SwimAudioVolume);
+            }
+        }
+
+        void HandleBubbleTrail()
+        {
+            // 움직임 입력이 있을 때
+            if (_isSwimming && _input.move != Vector2.zero)
+            {
+                if (!bubbleTrailEffect.isPlaying) bubbleTrailEffect.Play();
+
+                // ★ 핵심: 질주(Sprint) 중이면 버블을 많이, 아니면 적게
+                var emission = bubbleTrailEffect.emission;
+                
+                // RateOverTime을 속도에 따라 변경
+                // 예: 달리기면 20개, 걷기면 5개
+                emission.rateOverTime = _input.sprint ? 20f : 5f; 
+            }
+            else
+            {
+                if (bubbleTrailEffect.isPlaying) bubbleTrailEffect.Stop();
+            }
+        }
         private void OnTriggerEnter(Collider other)
         {
             if ((waterMask & (1 << other.gameObject.layer)) != 0)
