@@ -38,6 +38,7 @@ Material:
   - _VERTEXCOLORWAVEFLATTENING_ON
   - _WORLDSPACEUV_ON
   - _ZCLIP_ON
+  - _ZWRITE_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
@@ -155,7 +156,7 @@ Material:
     - _Blend: 0
     - _BumpScale: 1
     - _CROSSPAN_INTERSECTIONOn: 1
-    - _CausticsBrightness: 2
+    - _CausticsBrightness: 16.8
     - _CausticsChromance: 1
     - _CausticsDistortion: 0.054
     - _CausticsOn: 1
@@ -209,14 +210,14 @@ Material:
     - _Glossiness: 0
     - _GlossyReflections: 0
     - _HorizonDistance: 8
-    - _IntersectionClipping: 0.706
-    - _IntersectionDistortion: 0
+    - _IntersectionClipping: 0.899
+    - _IntersectionDistortion: 0.132
     - _IntersectionFalloff: 1
     - _IntersectionFoamOn: 1
-    - _IntersectionLength: 3
+    - _IntersectionLength: 2.3
     - _IntersectionRippleDist: 32
     - _IntersectionRippleSpeed: 3
-    - _IntersectionRippleStrength: 0.5
+    - _IntersectionRippleStrength: 0
     - _IntersectionSharp: 1
     - _IntersectionSize: 0.944
     - _IntersectionSource: 0
@@ -258,7 +259,7 @@ Material:
     - _RefractionAmount: 0.05
     - _RefractionChromaticAberration: 1
     - _RefractionOn: 1
-    - _RefractionStrength: 0.105
+    - _RefractionStrength: 0
     - _RimRize: 1
     - _RimTiling: 0.025
     - _RiverModeOn: 0
@@ -319,7 +320,7 @@ Material:
     - _WorkflowMode: 1
     - _WorldSpaceUV: 1
     - _ZClip: 1
-    - _ZWrite: 0
+    - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0, g: 0.16451614, b: 0.34, a: 0.9647059}
     - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
@@ -333,7 +334,7 @@ Material:
     - _FoamTiling: {r: 0.1, g: 0.1, b: 0, a: 0}
     - _HorizonColor: {r: 0.68, g: 1, b: 0.99, a: 0.15}
     - _IntersectionColor: {r: 1, g: 1, b: 1, a: 1}
-    - _NormalTiling: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _NormalTiling: {r: 0.17999995, g: 0.17999995, b: 0, a: 0}
     - _RimColor: {r: 1, g: 1, b: 1, a: 1}
     - _ShallowColor: {r: 0, g: 1, b: 0.98136926, a: 0.3764706}
     - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}

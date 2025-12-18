@@ -50,6 +50,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _CausticsDistortion: 0.792
+    - _CausticsOn: 1
     - _Cull: 0
     - _Depth: 2.47
     - _DepthHorizontal: 0.01
@@ -73,6 +74,7 @@ Material:
     - _ReflectionLighting: 1
     - _ReflectionStrength: 1
     - _RefractionOn: 1
+    - _RiverModeOn: 0
     - _ShadingMode: 1
     - _ShadowStrength: 0.934
     - _SpecularReflectionsOn: 0
@@ -88,6 +90,7 @@ Material:
     - _WaveSpeed: 2
     - _WaveSteepness: 0.1
     - _WaveTint: 0
+    - _ZClip: 1
     - _ZWrite: 0
     m_Colors:
     - _BaseColor: {r: 0, g: 0.44, b: 0.62, a: 1}
