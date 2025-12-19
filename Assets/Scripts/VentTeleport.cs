@@ -9,20 +9,48 @@ public class VentTeleport : MonoBehaviour
     [Header("설정")]
     public Transform exitPoint;   // 도착할 지점 (빈 오브젝트)
     public CanvasGroup fadePanel; // 아까 만든 검은 화면 패널
+    public GameObject bubbleGuideObj;
     public float fadeDuration = 0.5f; // 깜빡이는 속도
 
     private bool isTeleporting = false;
+    private bool isPlayerInZone = false; // 플레이어가 범위 안에 있는지 확인용
+    private GameObject playerRef;
 
     private void OnTriggerEnter(Collider other)
     {
-        // 플레이어만 태운다 (Tag가 "Player"인지 확인 필수!)
-        if (other.CompareTag("Player") && !isTeleporting )
+        if (other.CompareTag("Player"))
         {
-            //GameManager.;
-            if (Input.GetKeyDown(KeyCode.E)){
-                StartCoroutine(TeleportRoutine(other.gameObject));
+            Debug.Log("Player Entered Zone"); // 이게 뜨는지 먼저 확인!
+            isPlayerInZone = true;
+            playerRef = other.gameObject;
+
+            if (bubbleGuideObj != null) bubbleGuideObj.SetActive(true);
+        }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            isPlayerInZone = false;
+            playerRef = null;
+
+            if (bubbleGuideObj != null) bubbleGuideObj.SetActive(false);
+        }
+    }
+
+    private void Update()
+    {
+        if (isPlayerInZone && !isTeleporting)
+        {
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                Debug.Log("E Key Pressed! Start Teleport");
+                if (playerRef != null)
+                {
+                    StartCoroutine(TeleportRoutine(playerRef));
+                }
             }
-            
         }
     }
 
@@ -33,7 +61,7 @@ public class VentTeleport : MonoBehaviour
         CharacterController cc = player.GetComponent<CharacterController>();
 
         // 1. 플레이어 조작 얼리기 (입력 막기)
-        // if (pc != null) pc.enabled = false; // 필요하면 주석 해제
+        if (pc != null) pc.enabled = false; // 필요하면 주석 해제
 
         // 2. 화면 어둡게 (Fade Out)
         float timer = 0f;
@@ -69,7 +97,7 @@ public class VentTeleport : MonoBehaviour
         fadePanel.alpha = 0f;
 
         // 5. 조작 풀기
-        // if (pc != null) pc.enabled = true;
+        if (pc != null) pc.enabled = true;
         isTeleporting = false;
     }
 }

@@ -240,7 +240,7 @@ Material:
     - _OcclusionStrength: 1
     - _PlanarReflectionsEnabled: 0
     - _PlanarReflectionsParams: 0
-    - _PointSpotLightReflectionDistortion: 0.5
+    - _PointSpotLightReflectionDistortion: 0.43
     - _PointSpotLightReflectionExp: 64
     - _PointSpotLightReflectionSharp: 0
     - _PointSpotLightReflectionSize: 0
@@ -292,6 +292,9 @@ Material:
     - _SunReflectionStrength: 10
     - _Surface: 0
     - _TEXTURE_INTERSECTIONOn: 0
+    - _TessMax: 15
+    - _TessMin: 0
+    - _TessValue: 1
     - _Texture_IntersectionOn: 1
     - _Tiling: 0.5
     - _Translucency: 1
