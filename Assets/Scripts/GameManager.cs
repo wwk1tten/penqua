@@ -25,6 +25,7 @@ public class GameManager : MonoBehaviour
     public float flashDuration = 0.2f;
     [Header("캡슐")]
     public ParticleSystem CapsuleParticle;
+    public bool hasKeycard = false;
    
     void Awake()
     {
@@ -130,6 +131,13 @@ public class GameManager : MonoBehaviour
         {
             StartCoroutine(FlashRoutine());
         }
+    }
+
+    
+    public void GetKey()
+    {
+        hasKeycard = true;
+        Debug.Log("키카드 획득!");
     }
 
     IEnumerator FlashRoutine()

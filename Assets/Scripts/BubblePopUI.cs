@@ -28,16 +28,13 @@ public class BubblePopUI : MonoBehaviour
             float t = timer / 0.4f;
             
             // 사인 그래프를 이용한 탄성 효과 (커졌다가 살짝 작아짐)
-            float scale = Mathf.Sin(t * Mathf.PI) * 0.2f + 1.0f; 
-            transform.localScale = originalScale * Mathf.Clamp01(scale);
-            
+            float scaleProgress = Mathf.Sin(t * Mathf.PI) * 0.3f + t;
+            transform.localScale = originalScale * scaleProgress;            
             yield return null;
         }
         
         // 2. 둥둥 떠있기 (Idle)
         transform.localScale = originalScale;
-        
-        // 둥실둥실 움직임은 Update에서 처리하거나 여기서 루프
     }
 
     void Update()

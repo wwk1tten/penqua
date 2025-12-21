@@ -20,7 +20,6 @@ public class VentTeleport : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            Debug.Log("Player Entered Zone"); // 이게 뜨는지 먼저 확인!
             isPlayerInZone = true;
             playerRef = other.gameObject;
 
@@ -32,11 +31,17 @@ public class VentTeleport : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            isPlayerInZone = false;
-            playerRef = null;
-
-            if (bubbleGuideObj != null) bubbleGuideObj.SetActive(false);
+            ResetZoneState();
         }
+    }
+
+    private void ResetZoneState()
+    {
+        Debug.Log("Zone State Reset");
+        isPlayerInZone = false;
+        playerRef = null;
+
+        if (bubbleGuideObj != null) bubbleGuideObj.SetActive(false);
     }
 
     private void Update()
@@ -45,7 +50,6 @@ public class VentTeleport : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.E))
             {
-                Debug.Log("E Key Pressed! Start Teleport");
                 if (playerRef != null)
                 {
                     StartCoroutine(TeleportRoutine(playerRef));
@@ -85,6 +89,8 @@ public class VentTeleport : MonoBehaviour
         yield return new WaitForSeconds(0.2f); // 잠깐 대기 (로딩 느낌)
 
         if (cc != null) cc.enabled = true; // 다시 켜기
+
+        ResetZoneState();
 
         // 4. 화면 밝게 (Fade In)
         timer = 0f;
