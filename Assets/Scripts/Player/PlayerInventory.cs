@@ -4,6 +4,7 @@ public class PlayerInventory : MonoBehaviour{
     public bool hasKeycard = false; 
     public bool hasHammer = false;
 
+
     public void GetKey()
     {
         hasKeycard = true;
@@ -15,4 +16,5 @@ public class PlayerInventory : MonoBehaviour{
         hasHammer = true;
         Debug.Log("망치 획득!");
     }
+
 }

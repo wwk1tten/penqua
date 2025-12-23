@@ -117,6 +117,9 @@ namespace StarterAssets
         [Tooltip("How fast the character rotates to face the camera direction while aiming.")]
         public float AimRotationSpeed = 20f;
         private bool _isAiming;
+        [Header("Objects")]
+        public bool hasHammer = false;
+        public bool hasWarehouseKey = false; // 창고 열쇠
         
         private List<CapsuleData> collectedCapsules = new List<CapsuleData>();
         private Camera mainCamera;
@@ -643,6 +646,7 @@ namespace StarterAssets
             // 5. 리스트에서 제거 (사용했으니 삭제)
             collectedCapsules.RemoveAt(0);
         }
+
         private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
         {
             if (lfAngle < -360f) lfAngle += 360f;
@@ -715,8 +719,7 @@ namespace StarterAssets
             }
         }
 
-        void HandleBubbleTrail()
-        {
+        void HandleBubbleTrail(){
             // 움직임 입력이 있을 때
             if (_isSwimming && _input.move != Vector2.zero)
             {
@@ -734,6 +737,32 @@ namespace StarterAssets
                 if (bubbleTrailEffect.isPlaying) bubbleTrailEffect.Stop();
             }
         }
+
+        public bool HasCapsule(string targetID)
+        {
+            foreach (var capsule in collectedCapsules)
+            {
+                if (capsule.capsuleID.Trim() == targetID.Trim())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public void UseCapsule(string targetID)
+        {
+            for (int i = 0; i < collectedCapsules.Count; i++)
+            {
+                if (collectedCapsules[i].capsuleID == targetID)
+                {
+                    collectedCapsules.RemoveAt(i);
+                    Debug.Log($"캡슐 '{targetID}'번을 사용했습니다.");
+                    break;
+                }
+            }
+        }
+
         private void OnTriggerEnter(Collider other)
         {
             if ((waterMask & (1 << other.gameObject.layer)) != 0)
@@ -776,6 +805,7 @@ namespace StarterAssets
                 // 먹자마자 게임 매니저에 알림 (비상구 불 켜기 등)
                 GameManager.Instance.OnCapsuleCollected(capsule.capsuleID);
 
+
                 // 캡슐 오브젝트 파괴
                 Destroy(capsule.gameObject);
             }
@@ -804,5 +834,10 @@ namespace StarterAssets
                 
             }
         }
+
+        public void GetHammer() { hasHammer = true; }
+        public void GetKey() { hasWarehouseKey = true; }
     }
+
+    
 }

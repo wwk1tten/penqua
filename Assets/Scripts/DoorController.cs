@@ -1,39 +1,113 @@
 using UnityEngine;
+using StarterAssets; // Player 스크립트 참조용
 
 public class DoorController : MonoBehaviour
 {
-    [Header("UI 연결")]
-    public GameObject bubbleKeyNeeded; // 열쇠 그림 버블 (열쇠 없을 때)
-    public GameObject bubblePressE;    // E 버튼 버블 (열쇠 있을 때)
+    // 문 종류 선택 (인스펙터에서 설정)
+    public enum DoorType 
+    { 
+        NeedKeycard,      // 키카드가 있어야 열림 (직접 상호작용)
+        NeedMasterKey,    // 창고 열쇠(마스터키)가 있어야 열림 (직접 상호작용)
+        RemoteOnly        // 플레이어가 못 엽니다. LSS 콘솔 신호로만 열림
+    }
 
-    [Header("문 모델 연결")]
-    public GameObject closedDoorModel; // 닫혀있는 문 (Collider 포함)
-    public GameObject openDoorModel;   // 활짝 열려있는 문 프리팹
-
-    [Header("상태")]
+    [Header("문 설정")]
+    public DoorType doorType = DoorType.NeedKeycard; // 기본값
     public bool isOpened = false;
 
+    [Header("UI 연결")]
+    public GameObject bubbleLocked;    // 잠김(열쇠 필요) 아이콘
+    public GameObject bubblePressE;    // E 버튼 아이콘
+
+    [Header("모델 연결")]
+    public GameObject closedDoorModel; // 닫힌 문
+    public GameObject openDoorModel;   // 열린 문
+
     private bool isPlayerInZone = false;
-    private PlayerInventory playerInv; // 플레이어 인벤토리 참조
+    private ThirdPersonController playerScript; // 플레이어 스크립트
 
     void Start()
     {
-        // 초기화: 문 닫힘, 열린 문 모델은 숨김, 버블 다 끔
-        if (closedDoorModel != null) closedDoorModel.SetActive(true);
-        if (openDoorModel != null) openDoorModel.SetActive(false);
+        UpdateDoorVisuals(); // 시작할 때 모델 상태 동기화
         
-        if (bubbleKeyNeeded != null) bubbleKeyNeeded.SetActive(false);
+        if (bubbleLocked != null) bubbleLocked.SetActive(false);
         if (bubblePressE != null) bubblePressE.SetActive(false);
+    }
+
+    // ★ 1. 외부(LSS 콘솔)에서 호출하는 함수 (원격 문 열기)
+    public void RemoteOpen()
+    {
+        if (isOpened) return; // 이미 열렸으면 패스
+
+        isOpened = true;
+        UpdateDoorVisuals();
+        
+        Debug.Log("원격 신호 수신: 문이 열렸습니다!");
+        // 효과음 재생 (철커덩!)
+    }
+
+    // ★ 2. 플레이어 직접 상호작용 (E키)
+    private void Update()
+    {
+        // 이미 열렸거나, 원격 전용 문이면 E키 반응 안 함
+        if (isOpened || doorType == DoorType.RemoteOnly) return;
+
+        if (isPlayerInZone && Input.GetKeyDown(KeyCode.E))
+        {
+            TryOpenDoor();
+        }
+    }
+
+    void TryOpenDoor()
+    {
+        if (playerScript == null) return;
+
+        bool canOpen = false;
+
+        // 문 타입에 따라 필요한 열쇠 확인
+        switch (doorType)
+        {
+            case DoorType.NeedKeycard:
+                // 플레이어 스크립트에 hasKeycard 변수가 있다고 가정
+                // (만약 없다면 hasKeycard 부분 수정 필요)
+                // if (playerScript.hasKeycard) canOpen = true; 
+                canOpen = true; // 테스트용: 일단 무조건 열리게 (변수 확인 후 주석 해제하세요)
+                break;
+
+            case DoorType.NeedMasterKey:
+                if (playerScript.hasWarehouseKey) canOpen = true;
+                break;
+        }
+
+        if (canOpen)
+        {
+            isOpened = true;
+            UpdateDoorVisuals();
+            UpdateBubbleState(); // 문 열렸으니 UI 끄기
+            Debug.Log("열쇠를 사용해 문을 열었습니다.");
+        }
+        else
+        {
+            Debug.Log("맞는 열쇠가 없습니다!");
+            // 띠띠~ 실패음 재생
+        }
+    }
+
+    // 문 상태에 따라 모델 껐다 켜기
+    void UpdateDoorVisuals()
+    {
+        if (closedDoorModel != null) closedDoorModel.SetActive(!isOpened);
+        if (openDoorModel != null) openDoorModel.SetActive(isOpened);
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Player") && !isOpened)
+        // 문이 닫혀있고, 원격 전용이 아닐 때만 UI 표시
+        if (other.CompareTag("Player") && !isOpened && doorType != DoorType.RemoteOnly)
         {
             isPlayerInZone = true;
-            playerInv = other.GetComponent<PlayerInventory>();
-
-            UpdateBubbleState(); // 상황에 맞는 버블 켜기
+            playerScript = other.GetComponent<ThirdPersonController>();
+            UpdateBubbleState();
         }
     }
 
@@ -42,69 +116,45 @@ public class DoorController : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             isPlayerInZone = false;
-            playerInv = null;
+            playerScript = null;
 
-            // 나갈 땐 모든 버블 끄기
-            if (bubbleKeyNeeded != null) bubbleKeyNeeded.SetActive(false);
+            if (bubbleLocked != null) bubbleLocked.SetActive(false);
             if (bubblePressE != null) bubblePressE.SetActive(false);
         }
     }
 
-    private void Update()
-    {
-        // 문이 이미 열렸으면 아무것도 안 함
-        if (isOpened) return;
-
-        // 플레이어가 근처에 있고 + 열쇠가 있고 + E를 눌렀을 때
-        if (isPlayerInZone && Input.GetKeyDown(KeyCode.E))
-        {
-            if (playerInv != null && playerInv.hasKeycard)
-            {
-                OpenDoor();
-            }
-            else
-            {
-                // 열쇠 없는데 E 누르면? "잠김" 효과음 재생 (선택)
-                Debug.Log("열쇠가 필요해!"); 
-            }
-        }
-    }
-
-    // 버블 상태 갱신 함수
     void UpdateBubbleState()
     {
-        if (playerInv == null) return;
-
-        // 기존 버블 일단 다 끄고
-        if (bubbleKeyNeeded != null) bubbleKeyNeeded.SetActive(false);
-        if (bubblePressE != null) bubblePressE.SetActive(false);
-
-        // 조건 검사
-        if (playerInv.hasKeycard)
+        if (playerScript == null || isOpened) 
         {
-            // 열쇠 있음 -> E 버튼 보여주기
+            if (bubbleLocked != null) bubbleLocked.SetActive(false);
+            if (bubblePressE != null) bubblePressE.SetActive(false);
+            return;
+        }
+
+        bool hasTheKey = false;
+
+        // 내가 가진 열쇠 확인
+        switch (doorType)
+        {
+            case DoorType.NeedKeycard:
+                // if (playerScript.hasKeycard) hasTheKey = true;
+                hasTheKey = true; // 테스트용
+                break;
+            case DoorType.NeedMasterKey:
+                if (playerScript.hasWarehouseKey) hasTheKey = true;
+                break;
+        }
+
+        if (hasTheKey)
+        {
             if (bubblePressE != null) bubblePressE.SetActive(true);
+            if (bubbleLocked != null) bubbleLocked.SetActive(false);
         }
         else
         {
-            // 열쇠 없음 -> 열쇠 그림 보여주기
-            if (bubbleKeyNeeded != null) bubbleKeyNeeded.SetActive(true);
+            if (bubblePressE != null) bubblePressE.SetActive(false);
+            if (bubbleLocked != null) bubbleLocked.SetActive(true);
         }
-    }
-
-    void OpenDoor()
-    {
-        isOpened = true;
-        Debug.Log("문이 열렸습니다!");
-
-        // 1. 버블 숨기기
-        if (bubblePressE != null) bubblePressE.SetActive(false);
-
-        // 2. 모델 교체 (닫힌 문 끄고, 열린 문 켜기)
-        if (closedDoorModel != null) closedDoorModel.SetActive(false);
-        if (openDoorModel != null) openDoorModel.SetActive(true);
-
-        // 3. 소리 재생 (선택)
-        // SoundEmitter.MakeSound(...) 
     }
 }

@@ -1,3 +1,4 @@
+using StarterAssets;
 using UnityEngine;
 
 public class KeyController : MonoBehaviour
@@ -7,6 +8,7 @@ public class KeyController : MonoBehaviour
 
     private bool isPlayerInZone = false;
     private PlayerInventory playerInv; // 플레이어 인벤토리 참조
+    private ThirdPersonController playerScript;
 
     void Start()
     {
@@ -20,6 +22,7 @@ public class KeyController : MonoBehaviour
         {
             isPlayerInZone = true;
             playerInv = other.GetComponent<PlayerInventory>();
+            playerScript = other.GetComponent<ThirdPersonController>();
 
             // 가까이 오면 버블 띠용~
             if (bubbleUI != null) bubbleUI.SetActive(true);
@@ -47,14 +50,15 @@ public class KeyController : MonoBehaviour
         }
     }
 
-    void PickUpKey()
-    {
+    void PickUpKey(){
         Debug.Log("열쇠를 주웠습니다!");
 
         // 1. 플레이어 주머니에 열쇠 정보 입력
-        if (playerInv != null)
-        {
-            playerInv.GetKey(); // 아까 만든 함수 호출
+        if (playerInv != null){
+            playerInv.GetKey(); 
+        }
+        if (playerScript != null) {
+            playerScript.hasWarehouseKey = true;
         }
 
         // 2. 획득 효과음 (있으면)

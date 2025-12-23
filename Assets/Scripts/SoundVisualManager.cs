@@ -37,8 +37,7 @@ public class SoundVisualManager : MonoBehaviour
 
         emitParams.startColor = isRunning ? runColor : walkColor;
 
-        // 발사
-        Debug.Log($"[Emit] 발사! 위치: {emitParams.position}, 크기: {emitParams.startSize}");
+
         rippleParticle.Emit(emitParams, 1);
     }
 }

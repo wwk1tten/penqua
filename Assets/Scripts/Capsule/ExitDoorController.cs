@@ -60,10 +60,10 @@ public class ExitDoorController : MonoBehaviour
     void OpenDoor()
     {
         isOpen = true;
-        Debug.Log("문이 열립니다!");
+        //Debug.Log("문이 열립니다!");
         
         // 문 열리는 소리
-        if (audioSource != null) audioSource.PlayOneShot(doorOpenSound);
+        //if (audioSource != null) audioSource.PlayOneShot(doorOpenSound);
 
         // 문 오브젝트를 비활성화하거나 애니메이션 재생
         // 간단하게 사라지게 하거나, 회전시키는 코드 추가 가능
