@@ -279,7 +279,7 @@ Material:
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SparkleIntensity: 0
-    - _SparkleSize: 0.155
+    - _SparkleSize: 0.11
     - _SpecularHighlights: 1
     - _SpecularReflectionsOn: 1
     - _Speed: 1

@@ -228,9 +228,9 @@ Material:
     - _SlopeAngleFalloff: 25
     - _SlopeAngleThreshold: 35
     - _SlopeFoam: 0.73
-    - _SlopeSpeed: 6
+    - _SlopeSpeed: 2
     - _SlopeStretch: 0.491
-    - _SlopeStretching: 0.436
+    - _SlopeStretching: 0.56
     - _SlopeThreshold: 0.25
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
