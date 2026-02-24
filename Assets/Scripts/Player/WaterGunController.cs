@@ -20,7 +20,7 @@ public class WaterGunController : MonoBehaviour
     [Header("물탱크 시스템")]
     public float maxWater = 100f;
     public float waterConsumptionRate = 20f; // 초당 물 소모량
-    public float puddleConsumptionRate = 50f; // 웅덩이 생성시 물 소모량
+    public float puddleConsumptionRate = 50f; // NavPuddle_Obstacle 
     public float reloadTime = 2.0f; // 재장전에 걸리는 시간
     private float currentWater;
 

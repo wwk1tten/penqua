@@ -39,10 +39,7 @@ public class HammerController : MonoBehaviour
             // 1. 망치 획득 처리
             if (playerInv != null) playerInv.GetHammer();
 
-            // 2. 사운드 재생 (쾅!)
-            // AudioSource.PlayClipAtPoint(hammerSound, transform.position);
-
-            // 3. 삭제
+            // 2. 삭제
             Destroy(gameObject);
         }
     }

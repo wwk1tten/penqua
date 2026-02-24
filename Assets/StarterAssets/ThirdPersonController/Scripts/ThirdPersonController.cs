@@ -176,6 +176,9 @@ namespace StarterAssets
         private bool _isOnPuddle = false;
         private bool _canReleaseAnimal = false;
         private bool _hasAnimator;
+        private bool isControlFrozen = false;
+        private bool isClimbing = false;
+        private float currentClimbSpeed = 0f;
         private bool IsCurrentDeviceMouse
         {
             get
@@ -234,6 +237,16 @@ namespace StarterAssets
                     _controller.Move(slideVelocity * Time.deltaTime);
                 }
                 return; // 조작 불가
+            }
+            // 조작이 얼어있다면 이동/중력/입력 계산을 아예 건너뜀
+
+            if (isControlFrozen) return; 
+
+            // 사다리를 타고 있을 때의 이동 로직 (플레이어가 주도적으로 처리)
+            if (isClimbing)
+            {
+                LadderMovement();
+                return; // 일반 이동 및 중력 로직 건너뜀
             }
 
             HandleCrouchInput();
@@ -805,7 +818,6 @@ namespace StarterAssets
                 // 먹자마자 게임 매니저에 알림 (비상구 불 켜기 등)
                 GameManager.Instance.OnCapsuleCollected(capsule.capsuleID);
 
-
                 // 캡슐 오브젝트 파괴
                 Destroy(capsule.gameObject);
             }
@@ -835,9 +847,40 @@ namespace StarterAssets
             }
         }
 
+        public void SetControlState(bool canControl)
+        {
+            isControlFrozen = !canControl;
+        }
+
+        public void StartClimbing(float speed)
+        {
+            isClimbing = true;
+            currentClimbSpeed = speed;
+            _animator.SetBool("IsClimbing", true); // 애니메이션 동기화
+        }
+
+        public void StopClimbing()
+        {
+            isClimbing = false;
+            _animator.SetBool("IsClimbing", false);
+        }
+
+        // 플레이어 내부에서 사다리 상하 이동을 처리
+        private void LadderMovement()
+        {
+            // 여기서 Input.GetAxis를 쓰거나, 새 Input System의 값을 받아옵니다.
+            float verticalInput = Input.GetAxis("Vertical"); 
+            
+            Vector3 moveDirection = Vector3.up * verticalInput * currentClimbSpeed * Time.deltaTime;
+            _controller.Move(moveDirection);
+
+            // 스페이스바 점프 하차 로직
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                StopClimbing();
+            }
+        }
         public void GetHammer() { hasHammer = true; }
         public void GetKey() { hasWarehouseKey = true; }
-    }
-
-    
+    } 
 }

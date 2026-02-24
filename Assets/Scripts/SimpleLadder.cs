@@ -3,10 +3,10 @@ using StarterAssets; // 플레이어 스크립트 네임스페이스
 
 public class SimpleLadder : MonoBehaviour
 {
-    [Header("사다리 속도")]
+    [Header("사다리 설정")]
     public float climbSpeed = 3.0f;
 
-    private ThirdPersonController playerScript;
+    private ThirdPersonController pc;
     private CharacterController charController;
     private bool isClimbing = false;
 
@@ -15,23 +15,32 @@ public class SimpleLadder : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             // 플레이어 컴포넌트 찾아오기
-            playerScript = other.GetComponent<ThirdPersonController>();
-            charController = other.GetComponent<CharacterController>();
+            ThirdPersonController pc = other.GetComponent<ThirdPersonController>();
 
-            if (playerScript != null)
+            if (pc != null)
             {
                 isClimbing = true;
-                playerScript.enabled = false; // 1. 기존 이동/중력 끄기 (핵심)
+                pc.enabled = false; // 1. 기존 이동/중력 끄기 (핵심)
+                // 플레이어의 상태를 '사다리 타기'로 변경하고 속도 값을 넘겨줍니다.
+                //pc.StartClimbing(climbSpeed);
             }
         }
     }
 
     void OnTriggerExit(Collider other)
     {
+        ThirdPersonController pc = other.GetComponent<ThirdPersonController>();
+            if (pc != null)
+            {
+                // 플레이어의 상태를 '일반'으로 복구합니다.
+                pc.StopClimbing();
+            }
+
         if (other.CompareTag("Player"))
         {
             StopClimbing();
         }
+        
     }
 
     void Update()
@@ -55,6 +64,6 @@ public class SimpleLadder : MonoBehaviour
     void StopClimbing()
     {
         isClimbing = false;
-        if (playerScript != null) playerScript.enabled = true; // 이동/중력 다시 켜기
+        if (pc != null) pc.enabled = true; // 이동/중력 다시 켜기
     }
 }
