@@ -1,3 +1,4 @@
+using StarterAssets;
 using UnityEngine;
 
 public class WaterGrowZone : MonoBehaviour
@@ -23,5 +24,11 @@ public class WaterGrowZone : MonoBehaviour
             // 3. 캡슐 오브젝트 파괴
             Destroy(capsule.gameObject);
         }
+
+        if (other.TryGetComponent(out ThirdPersonController pc))
+        {
+            //pc._isSwimming = true);
+        }
+
     }
 }

@@ -6,12 +6,12 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 #endif
 
-public struct CapsuleData
+/*public struct CapsuleData
 {
     public string capsuleID;
     public GameObject animalPrefab;
     public Sprite capsuleIcon; // UI에 표시할 아이콘
-}
+}*/
 
 public class PlayerInteraction : MonoBehaviour
 {
@@ -118,10 +118,8 @@ namespace StarterAssets
         public float AimRotationSpeed = 20f;
         private bool _isAiming;
         [Header("Objects")]
-        public bool hasHammer = false;
-        public bool hasWarehouseKey = false; // 창고 열쇠
         
-        private List<CapsuleData> collectedCapsules = new List<CapsuleData>();
+        //private List<CapsuleData> collectedCapsules = new List<CapsuleData>();
         private Camera mainCamera;
     
 
@@ -169,6 +167,8 @@ namespace StarterAssets
         private StarterAssetsInputs _input;
         private GameObject _mainCamera;
         private Vector3 _slipVelocity = Vector3.zero;
+        // 현재 플레이어 범위 안에 들어와 있는 상호작용 오브젝트
+        private IInteractable _currentInteractable;
         
 
         private const float _threshold = 0.01f;
@@ -251,6 +251,7 @@ namespace StarterAssets
 
             HandleCrouchInput();
             HandleAiming(); 
+            HandleInteraction();
             JumpAndGravity();
             GroundedCheck();
             HandleBubbleTrail();
@@ -295,6 +296,17 @@ namespace StarterAssets
             if (_hasAnimator)
             {
                 _animator.SetBool(_animIDIsAiming, _isAiming);
+            }
+        }
+        private void HandleInteraction()
+        {
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                if (_currentInteractable != null)
+                {
+                    // 상호작용 실행! (상대가 문인지, 펭귄인지, 아이템인지 몰라도 됨)
+                    _currentInteractable.Interact(gameObject);
+                }
             }
         }
 
@@ -633,33 +645,6 @@ namespace StarterAssets
             }
         }
 
-        void ActivateCapsule(Vector3 activationPoint)
-        {
-            // 1. 가진 캡슐이 없으면 실패
-            if (collectedCapsules.Count == 0)
-            {
-                Debug.Log("해방할 캡슐이 없습니다!");
-                return;
-            }
-
-            // 2. 가장 먼저 먹은 캡슐 꺼내기 (FIFO)
-            CapsuleData capsuleToRelease = collectedCapsules[0];
-
-            // 3. 동물 소환
-            if (capsuleToRelease.animalPrefab != null)
-            {
-                // activationPoint는 보통 플레이어 앞이나 지정된 위치
-                Instantiate(capsuleToRelease.animalPrefab, activationPoint, Quaternion.identity);
-            }
-
-            // 4. [핵심 변경] "수집"이 아니라 "방생" 함수를 호출!
-            // (이미 먹을 때 불은 켜졌고, 여기서는 방생 카운트를 올려서 탈출 조건을 체크함)
-            GameManager.Instance.OnAnimalReleased();
-
-            // 5. 리스트에서 제거 (사용했으니 삭제)
-            collectedCapsules.RemoveAt(0);
-        }
-
         private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
         {
             if (lfAngle < -360f) lfAngle += 360f;
@@ -751,33 +736,21 @@ namespace StarterAssets
             }
         }
 
-        public bool HasCapsule(string targetID)
-        {
-            foreach (var capsule in collectedCapsules)
-            {
-                if (capsule.capsuleID.Trim() == targetID.Trim())
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public void UseCapsule(string targetID)
-        {
-            for (int i = 0; i < collectedCapsules.Count; i++)
-            {
-                if (collectedCapsules[i].capsuleID == targetID)
-                {
-                    collectedCapsules.RemoveAt(i);
-                    Debug.Log($"캡슐 '{targetID}'번을 사용했습니다.");
-                    break;
-                }
-            }
-        }
-
         private void OnTriggerEnter(Collider other)
         {
+            // 1. 부딪힌 물체가 IInteractable 인터페이스를 가지고 있는지 확인
+            if (other.TryGetComponent(out IInteractable interactable))
+            {
+                _currentInteractable = interactable;
+                
+            }
+
+            // 2. 환경 변화(웅덩이 등)인 경우
+            if (other.CompareTag("WaterPuddle") && !isStunned)
+            {
+                //EnterPuddleState(other.GetComponent<Collider>());
+            }
+
             if ((waterMask & (1 << other.gameObject.layer)) != 0)
             {
                 _isSwimming = true;
@@ -803,28 +776,21 @@ namespace StarterAssets
                 }
                 Debug.Log("Slippery in");
             }
-
-            else if (other.TryGetComponent<CapsuleController>(out CapsuleController capsule))
-            {
-                // 캡슐 데이터 생성 및 리스트에 저장 (주머니에 넣기)
-                CapsuleData newData = new CapsuleData
-                {
-                    capsuleID = capsule.capsuleID,
-                    animalPrefab = capsule.animalPrefab, // 나중에 소환할 프리팹 정보 저장
-                    capsuleIcon = capsule.capsuleIcon
-                };
-                collectedCapsules.Add(newData);
-
-                // 먹자마자 게임 매니저에 알림 (비상구 불 켜기 등)
-                GameManager.Instance.OnCapsuleCollected(capsule.capsuleID);
-
-                // 캡슐 오브젝트 파괴
-                Destroy(capsule.gameObject);
-            }
+            
         }
 
         private void OnTriggerExit(Collider other)
         {
+            // 2. 범위를 벗어난 물체가 현재 기억하던 물체와 같다면 기억 삭제
+            if (other.TryGetComponent(out IInteractable interactable))
+            {
+                if (_currentInteractable == interactable)
+                {
+                    _currentInteractable = null;
+                    // UIManager.Instance.ShowInteractionPrompt(false);
+                }
+            }
+
             if ((waterMask & (1 << other.gameObject.layer)) != 0)
             {
                 _isSwimming = false;
@@ -880,7 +846,5 @@ namespace StarterAssets
                 StopClimbing();
             }
         }
-        public void GetHammer() { hasHammer = true; }
-        public void GetKey() { hasWarehouseKey = true; }
     } 
 }

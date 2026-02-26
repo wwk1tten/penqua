@@ -31,4 +31,26 @@ public class CapsuleController : MonoBehaviour
         // 계산된 Y값으로 위치를 업데이트합니다. X와 Z는 고정됩니다.
         transform.position = new Vector3(startPosition.x, newY, startPosition.z);
     }
+    
+    public void Interact(GameObject player)
+    {
+        // 1. 데이터 생성 (컨트롤러가 하던 일을 캡슐이 직접 함)
+        CapsuleData newData = new CapsuleData
+        {
+            capsuleID = this.capsuleID,
+            animalPrefab = this.animalPrefab,
+            capsuleIcon = this.capsuleIcon
+        };
+
+        // 2. 플레이어의 인벤토리에 데이터 전달
+        if (player.TryGetComponent(out PlayerInventory inventory))
+        {
+            //inventory.AddCapsule(newData);
+        }
+
+        // 3. 게임 매니저 알림 및 파괴
+        GameManager.Instance.OnCapsuleCollected(capsuleID);
+        Destroy(gameObject);
+    }
+    
 }
