@@ -25,6 +25,7 @@ public class DoorController : MonoBehaviour
 
     private bool isPlayerInZone = false;
     private ThirdPersonController playerScript; // 플레이어 스크립트
+    private PlayerInventory playerInventory;
 
     void Start()
     {
@@ -75,7 +76,7 @@ public class DoorController : MonoBehaviour
                 break;
 
             case DoorType.NeedMasterKey:
-                if (playerScript.hasWarehouseKey) canOpen = true;
+                if (playerInventory.hasWarehouseKey) canOpen = true;
                 break;
         }
 
@@ -142,7 +143,7 @@ public class DoorController : MonoBehaviour
                 hasTheKey = true; // 테스트용
                 break;
             case DoorType.NeedMasterKey:
-                if (playerScript.hasWarehouseKey) hasTheKey = true;
+                if (playerInventory.hasWarehouseKey) hasTheKey = true;
                 break;
         }
 

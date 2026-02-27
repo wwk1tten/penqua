@@ -28,7 +28,7 @@ public class CapsuleConsole : MonoBehaviour
     public UnityEvent onStage3Clear; 
 
     private bool isPlayerInZone = false;
-    private ThirdPersonController playerScript;
+    private PlayerInventory playerInventory;
 
     void Start() { UpdateBubbleState(); }
 
@@ -41,7 +41,7 @@ public class CapsuleConsole : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             isPlayerInZone = true;
-            playerScript = other.GetComponent<ThirdPersonController>();
+            playerInventory = other.GetComponent<PlayerInventory>();
             UpdateBubbleState();
         }
     }
@@ -51,7 +51,7 @@ public class CapsuleConsole : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             isPlayerInZone = false;
-            playerScript = null;
+            playerInventory = null;
             AllBubblesOff();
         }
     }
@@ -67,14 +67,14 @@ public class CapsuleConsole : MonoBehaviour
 
     void TryInsertCapsule()
     {
-        if (playerScript == null) return;
+        if (playerInventory == null) return;
 
         // 단계별 로직
         if (currentStage == 0) // 1단계
         {
-            if (playerScript.HasCapsule("1"))
+            if (playerInventory.HasCapsule(CapsuleType.Gecko))
             {
-                playerScript.UseCapsule("1");
+                playerInventory.UseCapsule(CapsuleType.Gecko);
                 currentStage = 1;
                 onStage1Clear.Invoke(); 
 
@@ -90,9 +90,9 @@ public class CapsuleConsole : MonoBehaviour
         }
         else if (currentStage == 1) // 2번 캡슐
         {
-            if (playerScript.HasCapsule("2"))
+            if (playerInventory.HasCapsule(CapsuleType.Herring))
             {
-                playerScript.UseCapsule("2");
+                playerInventory.UseCapsule(CapsuleType.Herring);
                 DropCapsule(1); // ★ 1번 동물(2단계) 투하
                 currentStage = 2;
                 onStage2Clear.Invoke(); 
@@ -100,9 +100,9 @@ public class CapsuleConsole : MonoBehaviour
         }
         else if (currentStage == 2) // 3번 캡슐
         {
-            if (playerScript.HasCapsule("3"))
+            if (playerInventory.HasCapsule(CapsuleType.Muskrat))
             {
-                playerScript.UseCapsule("3");
+                playerInventory.UseCapsule(CapsuleType.Muskrat);
                 currentStage = 3;
                 onStage3Clear.Invoke(); 
 
@@ -148,11 +148,11 @@ public class CapsuleConsole : MonoBehaviour
     void UpdateBubbleState()
     {
         AllBubblesOff();
-        if (playerScript == null || currentStage >= 3) return;
+        if (playerInventory == null || currentStage >= 3) return;
 
         string targetID = (currentStage + 1).ToString(); 
         
-        if (playerScript.HasCapsule(targetID))
+        if (playerInventory.HasCapsule(CapsuleType.Gecko))
         {
             if (bubblePressE != null) bubblePressE.SetActive(true);
         }

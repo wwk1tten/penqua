@@ -10,7 +10,7 @@ public class CapsuleController : MonoBehaviour
 
     [Tooltip("떠오르는 속도")]
     public float bobSpeed = 2f;
-    [Tooltip("이 캡슐의 고유 ID")]
+
     public string capsuleID = "A";
     public GameObject animalPrefab;
     public Sprite capsuleIcon; 
@@ -37,7 +37,7 @@ public class CapsuleController : MonoBehaviour
         // 1. 데이터 생성 (컨트롤러가 하던 일을 캡슐이 직접 함)
         CapsuleData newData = new CapsuleData
         {
-            capsuleID = this.capsuleID,
+            //capsuleID = this.capsuleID,
             animalPrefab = this.animalPrefab,
             capsuleIcon = this.capsuleIcon
         };

@@ -263,7 +263,7 @@ namespace StarterAssets
             }
 
             if (_canReleaseAnimal && Input.GetKeyDown(KeyCode.Q)) {
-                ActivateCapsule(transform.position);
+                //ActivateCapsule(transform.position);
             }
         }
 

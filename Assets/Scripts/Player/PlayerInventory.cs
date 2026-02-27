@@ -5,10 +5,16 @@ using UnityEngine;
 public enum CapsuleType
 {
     None = 0,
-    EmperorPenguin = 1,
-    AdeliePenguin = 2,
-    Seal = 3
-    // 필요한 동물 종류를 여기에 계속 추가합니다.
+    Gecko = 1,
+    Herring = 2,
+    Muskrat = 3
+}
+public enum ItemType
+{
+    None = 0,
+    Keycard = 1,
+    WarehouseKey = 2,
+    Hammer = 3,
 }
 
 [System.Serializable]
@@ -19,6 +25,8 @@ public struct CapsuleData
     public Sprite capsuleIcon;
 }
 public class PlayerInventory : MonoBehaviour{
+    [Header("보유 중인 열쇠 목록")]
+    //public List<KeyType> possessedKeys = new List<KeyType>();
     [Header("획득한 아이템 현황")]
     public bool hasKeycard = false; 
     public bool hasHammer = false;

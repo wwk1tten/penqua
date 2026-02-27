@@ -4,10 +4,11 @@ using UnityEngine;
 public class KeyController : MonoBehaviour
 {
     [Header("UI 연결")]
+    public string itemName = "WarehouseKey";
     public GameObject bubbleUI; // 아까 만든 E버튼 버블 (자식 오브젝트)
 
     private bool isPlayerInZone = false;
-    private PlayerInventory playerInv; // 플레이어 인벤토리 참조
+    private PlayerInventory playerInventory; // 플레이어 인벤토리 참조
     private ThirdPersonController playerScript;
 
     void Start()
@@ -15,13 +16,14 @@ public class KeyController : MonoBehaviour
         // 시작할 때 버블 꺼두기
         if (bubbleUI != null) bubbleUI.SetActive(false);
     }
+    
 
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Player"))
         {
             isPlayerInZone = true;
-            playerInv = other.GetComponent<PlayerInventory>();
+            playerInventory = other.GetComponent<PlayerInventory>();
             playerScript = other.GetComponent<ThirdPersonController>();
 
             // 가까이 오면 버블 띠용~
@@ -34,7 +36,7 @@ public class KeyController : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             isPlayerInZone = false;
-            playerInv = null;
+            playerInventory = null;
 
             // 멀어지면 버블 끄기
             if (bubbleUI != null) bubbleUI.SetActive(false);
@@ -54,11 +56,9 @@ public class KeyController : MonoBehaviour
         Debug.Log("열쇠를 주웠습니다!");
 
         // 1. 플레이어 주머니에 열쇠 정보 입력
-        if (playerInv != null){
-            playerInv.GetKey(); 
-        }
-        if (playerScript != null) {
-            playerScript.hasWarehouseKey = true;
+        if (playerInventory != null){
+            //playerInventory.GetKey();
+            playerInventory.hasWarehouseKey = true;
         }
 
         // 2. 획득 효과음 (있으면)
