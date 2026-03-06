@@ -6,13 +6,6 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 #endif
 
-/*public struct CapsuleData
-{
-    public string capsuleID;
-    public GameObject animalPrefab;
-    public Sprite capsuleIcon; // UI에 표시할 아이콘
-}*/
-
 public class PlayerInteraction : MonoBehaviour
 {
     // ... 이하 스크립트 내용

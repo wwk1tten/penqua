@@ -1,129 +1,142 @@
 using UnityEngine;
-using System.Collections.Generic; 
-using UnityEngine.UI; 
-using TMPro;
-using Image = UnityEngine.UI.Image;
+using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 using System.Collections;
-using System;
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("게임 목표 설정")]
-    public int totalCapsulesToCollect = 3; // 목표 개수
-    public List<string> collectedCapsuleIDs = new List<string>(); // 획득한 캡슐 ID 목록
-    public int releasedCount = 0;
-    [Header("연결된 시스템")] 
-    public ExitDoorController exitDoorController;
     public static GameManager Instance { get; private set; }
-    public TMP_Text capsuleCountText; // 캡슐 카운트
-    public GameObject ClearPanel;
+
+    [Header("게임 목표 설정 (캡슐)")]
+    public int totalCapsulesToCollect = 3;
+    // string 대신 앞서 정의한 CapsuleType을 사용합니다.
+    private HashSet<CapsuleType> collectedCapsuleTypes = new HashSet<CapsuleType>();
+    private int releasedCount = 0;
+
+    [Header("연결된 시스템 (선택 사항)")] 
+    [Tooltip("비상구 문 오브젝트를 직접 연결하세요")]
+    public ExitDoorController exitDoorController;
+
+    [Header("UI 및 이펙트 설정")]
+    public GameObject clearPanel;
+    public TMP_Text capsuleCountText;
+    public ParticleSystem capsuleParticle;
+    
+    [Header("피격 연출 (Vignette & Flash)")]
     public CanvasGroup damageOverlayGroup; 
-    public Image damageFlashImage; // (선택) 맞을 때 번쩍일 빨간 화면
-    [Header("타격 연출 설정")]
-    public Color flashColor = new Color(1f, 1f, 1f, 0.5f); // 흰색 반투명 추천
+    public UnityEngine.UI.Image damageFlashImage;
     public float flashDuration = 0.2f;
-    [Header("캡슐")]
-    public ParticleSystem CapsuleParticle;
-    public bool hasKeycard = false;
-   
+
     void Awake()
     {
-        // 싱글톤 인스턴스 설정
+        // 완벽한 싱글톤 패턴 구현
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject); // 씬이 바뀌어도 파괴되지 않음
+            // GameManager는 보통 씬마다 따로 두거나 파괴하지 않는데, 
+            // 현재 구조에서는 DontDestroyOnLoad 유지.
+            DontDestroyOnLoad(gameObject); 
         }
         else
         {
             Destroy(gameObject);
         }
     }
+
+    // ==========================================
+    // 1. 게임 진행 로직 (수집 및 방생)
+    // ==========================================
     
-    // 캡슐이 수집되었을 때 호출될 함수
-    
-    public void OnCapsuleCollected(string capsuleID)
+    // 플레이어가 캡슐을 "먹었을 때" 호출됨 (PlayerInventory 혹은 CapsuleController에서 호출)
+    public void OnCapsuleCollected(CapsuleType capsuleID)
     {
-        if (!collectedCapsuleIDs.Contains(capsuleID))
+        // HashSet을 사용하면 중복 검사(.Contains)가 List보다 훨씬 빠르고 깔끔합니다.
+        if (collectedCapsuleTypes.Add(capsuleID)) 
         {
-            collectedCapsuleIDs.Add(capsuleID);
-            Debug.Log($"capsule {capsuleID} collected! (total {collectedCapsuleIDs.Count})");
+            Debug.Log($"캡슐 {capsuleID} 획득! (총 {collectedCapsuleTypes.Count}개)");
             
-            //  비상구 전구 갱신하기 
+            // 비상구 전구 갱신
             if (exitDoorController != null)
             {
-                exitDoorController.UpdateLights(collectedCapsuleIDs.Count);
+                exitDoorController.UpdateLights(collectedCapsuleTypes.Count);
             }
 
-            if (CapsuleParticle != null)
+            // 파티클 재생
+            if (capsuleParticle != null)
             {
-        
-                CapsuleParticle.Stop(); // 혹시 재생 중이면 멈추고
-                CapsuleParticle.Play(); // 펑!
+                capsuleParticle.Stop(); 
+                capsuleParticle.Play(); 
             }
         }
     }
 
-    // 2. 캡슐을 물에 "풀어줬을 때" (미션 진행)
+    // 플레이어가 캡슐을 물웅덩이 등에 "풀어줬을 때" 호출됨
     public void OnAnimalReleased()
     {
-        releasedCount++; // 방생 카운트 증가
-        Debug.Log($"동물 방생! ({releasedCount}마리째)");
+        releasedCount++;
+        Debug.Log($"동물 방생 성공! ({releasedCount}/{totalCapsulesToCollect}마리)");
 
-        // ★ 불 켜는 로직은 여기서 뺍니다. (이미 켜져 있으니까)
-        
-        // 대신 승리 조건만 체크
-        if (releasedCount >= totalCapsulesToCollect)
+        // 목표치를 채웠는지 확인
+        if (CheckWinCondition())
         {
-            Debug.Log("탈출 조건 만족! 문이 완전히 개방됩니다.");
-            // 여기서 문이 물리적으로 열리는 애니메이션(OpenDoor)을 실행하면 됩니다.
-             if (exitDoorController != null)
+            Debug.Log("탈출 조건 만족! 비상구가 완전히 개방됩니다.");
+            // 탈출구를 물리적으로 여는 명령을 내립니다.
+            if (exitDoorController != null)
             {
-                // 불 켜는 거 말고, "문 여는 함수"를 따로 만들어서 호출
-                // exitDoorController.OpenDoorPhysics(); 
+                // exitDoorController.OpenDoorPhysics(); // 해당 스크립트에 이 함수를 만들어야 함
             }
         }
     }
-    
-    public void Replay(){
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        Time.timeScale = 1f;
-    }
 
-    public void BackToTitle(){
-        SceneManager.LoadScene("TitleScene");
-    }
-    
-    // 탈출 조건을 확인하는 함수
+    // 승리 조건 검사
     public bool CheckWinCondition()
     {
-        return collectedCapsuleIDs.Count >= 3;
+        // 기획에 따라 '수집' 기준인지 '방생' 기준인지 선택하세요.
+        // 현재는 '방생(releasedCount)' 기준으로 작성되었습니다.
+        return releasedCount >= totalCapsulesToCollect; 
     }
 
-    public void GameClear(){
-        if (ClearPanel != null) ClearPanel.SetActive(true);
+    // ==========================================
+    // 2. 씬 전환 및 게임 제어 (UI)
+    // ==========================================
+
+    public void GameClear()
+    {
+        if (clearPanel != null) clearPanel.SetActive(true);
         Time.timeScale = 0f;
 
-        UnityEngine.Cursor.lockState = CursorLockMode.None; // 커서를 자유롭게 풀어줌
-        UnityEngine.Cursor.visible = true;
+        // 마우스 잠금 해제 (UI 클릭을 위해)
+        Cursor.lockState = CursorLockMode.None; 
+        Cursor.visible = true;
     }
+
+    public void Replay()
+    {
+        Time.timeScale = 1f;
+        // 기존 상태 초기화 로직이 필요할 수 있습니다.
+        releasedCount = 0;
+        collectedCapsuleTypes.Clear();
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    public void BackToTitle()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("TitleScene"); // 실제 타이틀 씬 이름으로 변경하세요.
+    }
+
+    // ==========================================
+    // 3. 시각적 연출 (Damage, Flash)
+    // ==========================================
 
     public void UpdateVignette(int currentHealth, int maxHealth)
     {
-        // 1. 체력 비율 계산 (0.0 ~ 1.0)
+        if (damageOverlayGroup == null) return;
+
         float healthPercent = (float)currentHealth / maxHealth;
-
-        // 2. 비네팅 투명도 계산 (체력이 적을수록 불투명해짐)
-        // 체력 100% -> alpha 0 (안 보임)
-        // 체력 0% -> alpha 1 (완전 진하게 보임)
-        float targetAlpha = 1f - healthPercent;
-
-        // 3. 부드럽게 적용하지 않고 즉시 적용 (반응성을 위해)
-        if (damageOverlayGroup != null)
-        {
-            damageOverlayGroup.alpha = targetAlpha;
-        }
+        // 체력이 100%일 때 alpha 0, 0%일 때 alpha 1
+        damageOverlayGroup.alpha = 1f - healthPercent;
     }
 
     public void TriggerDamageFlash()
@@ -134,21 +147,12 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    
-    public void GetKey()
+    private IEnumerator FlashRoutine()
     {
-        hasKeycard = true;
-        Debug.Log("키카드 획득!");
-    }
-
-    IEnumerator FlashRoutine()
-    {
-        // 빨간색 확 켜기
         Color color = damageFlashImage.color;
-        color.a = 0.5f; // 반투명하게
+        color.a = 0.5f; 
         damageFlashImage.color = color;
 
-        // 서서히 사라지기
         float elapsed = 0f;
         while (elapsed < flashDuration)
         {
@@ -158,7 +162,6 @@ public class GameManager : MonoBehaviour
             yield return null;
         }
 
-        // 확실하게 끄기
         color.a = 0f;
         damageFlashImage.color = color;
     }

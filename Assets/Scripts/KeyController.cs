@@ -57,8 +57,7 @@ public class KeyController : MonoBehaviour
 
         // 1. 플레이어 주머니에 열쇠 정보 입력
         if (playerInventory != null){
-            //playerInventory.GetKey();
-            playerInventory.hasWarehouseKey = true;
+            playerInventory.GetItem(ItemType.WarehouseKey);
         }
 
         // 2. 획득 효과음 (있으면)

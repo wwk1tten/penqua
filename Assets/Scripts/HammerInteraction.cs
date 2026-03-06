@@ -59,7 +59,7 @@ public class HammerInteraction : MonoBehaviour
         // 플레이어가 범위 안에 있고 E키를 눌렀을 때
         if (isPlayerInZone && Input.GetKeyDown(KeyCode.E))
         {
-            if (playerInv != null && playerInv.hasHammer)
+            if (playerInv != null && playerInv.HasItem(ItemType.Hammer))
             {
                 Smash();
             }
@@ -81,7 +81,7 @@ public class HammerInteraction : MonoBehaviour
         if (bubblePressE != null) bubblePressE.SetActive(false);
 
         // 망치 유무에 따라 켜기
-        if (playerInv.hasHammer)
+        if (playerInv.HasItem(ItemType.Hammer))
         {
             if (bubblePressE != null) bubblePressE.SetActive(true);
         }

@@ -37,7 +37,7 @@ public class HammerController : MonoBehaviour
             Debug.Log("망치를 주웠습니다!");
             
             // 1. 망치 획득 처리
-            if (playerInv != null) playerInv.GetHammer();
+            if (playerInv != null) playerInv.HasItem(ItemType.Hammer);
 
             // 2. 삭제
             Destroy(gameObject);

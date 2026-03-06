@@ -1,18 +1,13 @@
 using UnityEngine;
-using StarterAssets; // Player 스크립트 참조용
 
-public class DoorController : MonoBehaviour
+public class DoorController : MonoBehaviour, IInteractable
 {
-    // 문 종류 선택 (인스펙터에서 설정)
-    public enum DoorType 
-    { 
-        NeedKeycard,      // 키카드가 있어야 열림 (직접 상호작용)
-        NeedMasterKey,    // 창고 열쇠(마스터키)가 있어야 열림 (직접 상호작용)
-        RemoteOnly        // 플레이어가 못 엽니다. LSS 콘솔 신호로만 열림
-    }
-
     [Header("문 설정")]
-    public DoorType doorType = DoorType.NeedKeycard; // 기본값
+    public bool isRemoteOnly = false; // true면 E키로 절대 안 열림 (LSS 콘솔 전용)
+    
+    // 2. DoorType enum을 과감히 버리고, 아까 만든 ItemType을 직접 사용합니다.
+    [Tooltip("이 문을 여는 데 필요한 열쇠 (None이면 열쇠 없이 열림)")]
+    public ItemType requiredKey = ItemType.None; 
     public bool isOpened = false;
 
     [Header("UI 연결")]
@@ -23,92 +18,66 @@ public class DoorController : MonoBehaviour
     public GameObject closedDoorModel; // 닫힌 문
     public GameObject openDoorModel;   // 열린 문
 
-    private bool isPlayerInZone = false;
-    private ThirdPersonController playerScript; // 플레이어 스크립트
-    private PlayerInventory playerInventory;
-
-    void Start()
+    private void Start()
     {
-        UpdateDoorVisuals(); // 시작할 때 모델 상태 동기화
-        
-        if (bubbleLocked != null) bubbleLocked.SetActive(false);
-        if (bubblePressE != null) bubblePressE.SetActive(false);
+        UpdateDoorVisuals();
+        HideBubbles();
     }
 
-    // ★ 1. 외부(LSS 콘솔)에서 호출하는 함수 (원격 문 열기)
+    // 외부(LSS 콘솔 등)에서 호출하는 원격 개방 함수
     public void RemoteOpen()
     {
-        if (isOpened) return; // 이미 열렸으면 패스
+        if (isOpened) return;
 
         isOpened = true;
         UpdateDoorVisuals();
+        HideBubbles(); // 문이 열렸으니 버블도 치웁니다.
         
         Debug.Log("원격 신호 수신: 문이 열렸습니다!");
-        // 효과음 재생 (철커덩!)
     }
 
-    // ★ 2. 플레이어 직접 상호작용 (E키)
-    private void Update()
+    // 플레이어가 E키를 눌렀을 때 실행되는 인터페이스 함수
+    public void Interact(GameObject player)
     {
-        // 이미 열렸거나, 원격 전용 문이면 E키 반응 안 함
-        if (isOpened || doorType == DoorType.RemoteOnly) return;
+        // 이미 열렸거나 원격 전용 문이면 무시
+        if (isOpened || isRemoteOnly) return;
 
-        if (isPlayerInZone && Input.GetKeyDown(KeyCode.E))
+        // 플레이어의 인벤토리를 확인합니다.
+        if (player.TryGetComponent(out PlayerInventory inv))
         {
-            TryOpenDoor();
+            // 요구하는 열쇠가 아예 없거나(None), 인벤토리에 해당 열쇠가 있다면 개방
+            if (requiredKey == ItemType.None || inv.HasItem(requiredKey))
+            {
+                isOpened = true;
+                UpdateDoorVisuals();
+                HideBubbles();
+                Debug.Log($"{requiredKey}를 사용해 문을 열었습니다.");
+            }
+            else
+            {
+                Debug.Log($"문이 잠겨있습니다. {requiredKey}가 필요합니다!");
+                // TODO: 실패음 재생
+            }
         }
     }
 
-    void TryOpenDoor()
-    {
-        if (playerScript == null) return;
-
-        bool canOpen = false;
-
-        // 문 타입에 따라 필요한 열쇠 확인
-        switch (doorType)
-        {
-            case DoorType.NeedKeycard:
-                // 플레이어 스크립트에 hasKeycard 변수가 있다고 가정
-                // (만약 없다면 hasKeycard 부분 수정 필요)
-                // if (playerScript.hasKeycard) canOpen = true; 
-                canOpen = true; // 테스트용: 일단 무조건 열리게 (변수 확인 후 주석 해제하세요)
-                break;
-
-            case DoorType.NeedMasterKey:
-                if (playerInventory.hasWarehouseKey) canOpen = true;
-                break;
-        }
-
-        if (canOpen)
-        {
-            isOpened = true;
-            UpdateDoorVisuals();
-            UpdateBubbleState(); // 문 열렸으니 UI 끄기
-            Debug.Log("열쇠를 사용해 문을 열었습니다.");
-        }
-        else
-        {
-            Debug.Log("맞는 열쇠가 없습니다!");
-            // 띠띠~ 실패음 재생
-        }
-    }
-
-    // 문 상태에 따라 모델 껐다 켜기
-    void UpdateDoorVisuals()
+    // 모델 상태 동기화
+    private void UpdateDoorVisuals()
     {
         if (closedDoorModel != null) closedDoorModel.SetActive(!isOpened);
         if (openDoorModel != null) openDoorModel.SetActive(isOpened);
     }
 
+    // ==========================================
+    // UI 버블 처리 구역 (트리거는 UI 띄우는 용도로만 사용)
+    // ==========================================
     private void OnTriggerEnter(Collider other)
     {
-        // 문이 닫혀있고, 원격 전용이 아닐 때만 UI 표시
-        if (other.CompareTag("Player") && !isOpened && doorType != DoorType.RemoteOnly)
+        if (isOpened || isRemoteOnly) return;
+
+        if (other.CompareTag("Player") && other.TryGetComponent(out PlayerInventory inv))
         {
-            isPlayerInZone = true;
-            playerScript = other.GetComponent<ThirdPersonController>();
-            UpdateBubbleState();
+            UpdateBubbleState(inv);
         }
     }
 
@@ -116,46 +85,24 @@ public class DoorController : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            isPlayerInZone = false;
-            playerScript = null;
-
-            if (bubbleLocked != null) bubbleLocked.SetActive(false);
-            if (bubblePressE != null) bubblePressE.SetActive(false);
+            HideBubbles();
         }
     }
 
-    void UpdateBubbleState()
+    private void UpdateBubbleState(PlayerInventory inv)
     {
-        if (playerScript == null || isOpened) 
-        {
-            if (bubbleLocked != null) bubbleLocked.SetActive(false);
-            if (bubblePressE != null) bubblePressE.SetActive(false);
-            return;
-        }
+        if (isOpened) return;
 
-        bool hasTheKey = false;
+        // 내가 필요한 열쇠를 가지고 있는지 확인하는 논리식
+        bool hasTheKey = (requiredKey == ItemType.None || inv.HasItem(requiredKey));
 
-        // 내가 가진 열쇠 확인
-        switch (doorType)
-        {
-            case DoorType.NeedKeycard:
-                // if (playerScript.hasKeycard) hasTheKey = true;
-                hasTheKey = true; // 테스트용
-                break;
-            case DoorType.NeedMasterKey:
-                if (playerInventory.hasWarehouseKey) hasTheKey = true;
-                break;
-        }
+        if (bubblePressE != null) bubblePressE.SetActive(hasTheKey);
+        if (bubbleLocked != null) bubbleLocked.SetActive(!hasTheKey);
+    }
 
-        if (hasTheKey)
-        {
-            if (bubblePressE != null) bubblePressE.SetActive(true);
-            if (bubbleLocked != null) bubbleLocked.SetActive(false);
-        }
-        else
-        {
-            if (bubblePressE != null) bubblePressE.SetActive(false);
-            if (bubbleLocked != null) bubbleLocked.SetActive(true);
-        }
+    private void HideBubbles()
+    {
+        if (bubbleLocked != null) bubbleLocked.SetActive(false);
+        if (bubblePressE != null) bubblePressE.SetActive(false);
     }
 }
