@@ -30,16 +30,12 @@ public class EscapeZone : MonoBehaviour
             if (GameManager.Instance.CheckWinCondition())
             {
                 Debug.Log("탈출 성공! 미션 클리어!");
-                // 게임 클리어 UI 호출
                 GameManager.Instance.GameClear(); 
             }
             else
             {
-                // 남은 개수 계산 (하드코딩 제거)
-                int totalGoals = GameManager.Instance.totalCapsulesToCollect; 
-                int current = GameManager.Instance.collectedCapsuleIDs.Count;
-                int remaining = totalGoals - current;
-
+                // 매니저의 리스트를 직접 뒤지는 대신, 정중하게 물어봅니다.
+                int remaining = GameManager.Instance.GetRemainingCapsuleCount();
                 Debug.Log($"아직 {remaining}명의 친구가 갇혀있어!");
             }
         }

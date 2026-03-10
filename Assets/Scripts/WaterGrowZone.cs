@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class WaterGrowZone : MonoBehaviour
 {
+    public GameManager gameManager;
     private void OnTriggerEnter(Collider other)
     {
         // 물에 들어온 것이 캡슐인지 확인
@@ -12,8 +13,8 @@ public class WaterGrowZone : MonoBehaviour
             Debug.Log($"캡슐 {capsule.capsuleID}가 물에 닿았습니다!");
 
             // 1. GameManager에 알림
-            GameManager.Instance.OnCapsuleCollected(capsule.capsuleID);
-            
+            gameManager.OnAnimalReleased();
+
             // 2. 동물 친구 생성
             if (capsule.animalPrefab != null)
             {

@@ -10,12 +10,11 @@ public class CapsuleController : MonoBehaviour
 
     [Tooltip("떠오르는 속도")]
     public float bobSpeed = 2f;
-
-    public string capsuleID = "A";
     public GameObject animalPrefab;
     public Sprite capsuleIcon; 
     
     private Vector3 startPosition;
+    public CapsuleType capsuleID;
 
     void Start()
     {
@@ -34,10 +33,10 @@ public class CapsuleController : MonoBehaviour
     
     public void Interact(GameObject player)
     {
-        // 1. 데이터 생성 (컨트롤러가 하던 일을 캡슐이 직접 함)
+        // 1. 데이터 생성
         CapsuleData newData = new CapsuleData
         {
-            //capsuleID = this.capsuleID,
+            capsuleID = this.capsuleID,
             animalPrefab = this.animalPrefab,
             capsuleIcon = this.capsuleIcon
         };
@@ -45,7 +44,7 @@ public class CapsuleController : MonoBehaviour
         // 2. 플레이어의 인벤토리에 데이터 전달
         if (player.TryGetComponent(out PlayerInventory inventory))
         {
-            //inventory.AddCapsule(newData);
+            inventory.AddCapsule(newData);
         }
 
         // 3. 게임 매니저 알림 및 파괴

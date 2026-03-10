@@ -10,12 +10,11 @@ public class GameManager : MonoBehaviour
 
     [Header("게임 목표 설정 (캡슐)")]
     public int totalCapsulesToCollect = 3;
-    // string 대신 앞서 정의한 CapsuleType을 사용합니다.
     private HashSet<CapsuleType> collectedCapsuleTypes = new HashSet<CapsuleType>();
     private int releasedCount = 0;
 
     [Header("연결된 시스템 (선택 사항)")] 
-    [Tooltip("비상구 문 오브젝트를 직접 연결하세요")]
+    [Tooltip("비상구 문 오브젝트 연결")]
     public ExitDoorController exitDoorController;
 
     [Header("UI 및 이펙트 설정")]
@@ -23,14 +22,13 @@ public class GameManager : MonoBehaviour
     public TMP_Text capsuleCountText;
     public ParticleSystem capsuleParticle;
     
-    [Header("피격 연출 (Vignette & Flash)")]
+    [Header("데미지 연출")]
     public CanvasGroup damageOverlayGroup; 
     public UnityEngine.UI.Image damageFlashImage;
     public float flashDuration = 0.2f;
 
     void Awake()
     {
-        // 완벽한 싱글톤 패턴 구현
         if (Instance == null)
         {
             Instance = this;
@@ -95,6 +93,12 @@ public class GameManager : MonoBehaviour
         // 기획에 따라 '수집' 기준인지 '방생' 기준인지 선택하세요.
         // 현재는 '방생(releasedCount)' 기준으로 작성되었습니다.
         return releasedCount >= totalCapsulesToCollect; 
+    }
+
+    // 방생한 캡슐(동물) 갯수
+    public int GetRemainingCapsuleCount()
+    {
+        return totalCapsulesToCollect - releasedCount;
     }
 
     // ==========================================
