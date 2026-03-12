@@ -131,8 +131,9 @@ public class WaterGunController : MonoBehaviour
 
         PlaySound(shootSound);
 
-        // NPC 타격 판정
-        if (hit.collider.CompareTag("Guard") && hit.collider.TryGetComponent(out GuardPatrol guard))
+        // NPC 타격 판정 (태그 대신 컴포넌트로 탐색 - 콜라이더가 자식에 있어도 동작)
+        GuardPatrol guard = hit.collider.GetComponentInParent<GuardPatrol>();
+        if (guard != null)
         {
             guard.TakeWaterDamage(1f, hit.point);
             PlaySound(guardHitSound);
@@ -175,7 +176,12 @@ public class WaterGunController : MonoBehaviour
     private void PlayShootingVFX(Ray ray, bool hasHit, RaycastHit hit)
     {
         if (waterStreamEffect == null) return;
-        
+
+        if (gunMuzzle != null)
+        {
+            waterStreamEffect.transform.position = gunMuzzle.position;
+        }
+
         if (!waterStreamEffect.isPlaying) waterStreamEffect.Play();
 
         Vector3 targetPoint = hasHit ? hit.point : ray.GetPoint(shootRange);

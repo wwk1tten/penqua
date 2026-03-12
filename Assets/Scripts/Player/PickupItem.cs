@@ -60,13 +60,9 @@ public class PickupItem : MonoBehaviour, IInteractable
     // ==========================================
     private void CollectItem(GameObject player)
     {
-        // TryGetComponent를 사용하여 안전하고 빠르게 컴포넌트 접근
-        if (player.TryGetComponent(out WaterGunController waterGun))
+        if (TryGetComponent(out IPickupEffect effect))
         {
-            waterGun.PickupWaterGun();
-            
-            // TODO: 무기 획득 효과음 (AudioSource.PlayClipAtPoint 등) 추가 가능
-            
+            effect.OnPickup(player);
             Destroy(gameObject);
         }
     }

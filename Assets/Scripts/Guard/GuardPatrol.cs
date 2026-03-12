@@ -1,4 +1,4 @@
-using System.Collections;
+ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
@@ -9,6 +9,7 @@ public class GuardPatrol : MonoBehaviour
     // 1. 설정 및 변수 (기존 유지)
     // =========================================================
     public enum GuardState { Patrol, Suspicious, Alert, Chase, Return }
+    public enum WetnessStage { Dry, Damp, Soaked, Overloaded }
 
     [Header("State")]
     public GuardState currentState = GuardState.Patrol;
@@ -48,6 +49,15 @@ public class GuardPatrol : MonoBehaviour
     public float puddleSpeedMultiplier = 0.5f;
     public float fallStunDuration = 1.5f;
 
+    [Header("Wetness Stages")]
+    [Range(0f, 1f)] public float stage1Threshold = 0.33f; // Damp: 살짝 젖음
+    [Range(0f, 1f)] public float stage2Threshold = 0.60f; // Soaked: 흠뻑
+    [Range(0f, 1f)] public float stage3Threshold = 0.85f; // Overloaded: 과부하 → 스턴
+    public float stage1SpeedMult = 0.8f;   // 이동 소폭 감소
+    public float stage2SpeedMult = 0.5f;   // 이동 크게 감소
+    public float normalAcceleration = 8f;  // 기본 NavMesh 가속도
+    public float slideAcceleration = 1.5f; // 미끄럼 표현용 가속도 (낮을수록 둔하게 방향 전환)
+
     // 내부 변수
     private NavMeshAgent agent;
     private AISensor sensor;
@@ -65,6 +75,8 @@ public class GuardPatrol : MonoBehaviour
     private float currentWetness = 0f;
     private bool isInPuddle = false;
     private bool isFalling = false;
+    private WetnessStage currentWetnessStage = WetnessStage.Dry;
+    private bool stunTriggeredThisWave = false; // 같은 젖음 파동에서 스턴 중복 방지
     
     private List<Material> wetnessMaterials = new List<Material>();
     private float basePatrolSpeed, baseAlertSpeed, baseChaseSpeed;
@@ -123,7 +135,7 @@ public class GuardPatrol : MonoBehaviour
     }
 
     // =========================================================
-    // 3. Update (여기가 핵심 리팩토링)
+    // 3. Update 
     // =========================================================
     void Update()
     {
@@ -165,7 +177,7 @@ public class GuardPatrol : MonoBehaviour
     }
 
     // =========================================================
-    // 4. 기능별 분리 함수들 (깔끔하게 정리됨)
+    // 4. 기능별 분리 함수들 
     // =========================================================
 
     // [핵심] 공격 가능 여부 체크 및 실행
@@ -191,11 +203,40 @@ public class GuardPatrol : MonoBehaviour
 
     void HandleWetnessRecovery()
     {
+        if (isFalling) return; // 스턴 중에는 회복 일시 정지
+
         if (currentWetness > 0)
         {
             currentWetness -= wetnessDecayRate * Time.deltaTime;
             currentWetness = Mathf.Max(0, currentWetness);
         }
+    }
+
+    WetnessStage GetWetnessStage()
+    {
+        float ratio = currentWetness / maxWetness;
+        if (ratio >= stage3Threshold) return WetnessStage.Overloaded;
+        if (ratio >= stage2Threshold) return WetnessStage.Soaked;
+        if (ratio >= stage1Threshold) return WetnessStage.Damp;
+        return WetnessStage.Dry;
+    }
+
+    void OnWetnessStageChanged(WetnessStage from, WetnessStage to)
+    {
+        // 과부하 진입 시 스턴 발동 (중복 방지)
+        if (to == WetnessStage.Overloaded && !isFalling && !stunTriggeredThisWave)
+        {
+            stunTriggeredThisWave = true;
+            StartCoroutine(FallInPuddleCoroutine());
+        }
+
+        // 과부하에서 내려오면 다음 과부하에서 다시 스턴 가능
+        if (from == WetnessStage.Overloaded && to != WetnessStage.Overloaded)
+        {
+            stunTriggeredThisWave = false;
+        }
+
+        Debug.Log($"[{gameObject.name}] 젖음 단계: {from} → {to}");
     }
 
     void DetectPlayer()
@@ -418,18 +459,49 @@ public class GuardPatrol : MonoBehaviour
 
     void UpdateSpeedByWetness()
     {
-        float speedMultiplier = 1f - (currentWetness / maxWetness);
-        speedMultiplier = Mathf.Clamp01(speedMultiplier);
+        WetnessStage stage = GetWetnessStage();
 
-        float currentBaseSpeed = patrolSpeed;
+        // 단계 전환 감지
+        if (stage != currentWetnessStage)
+        {
+            OnWetnessStageChanged(currentWetnessStage, stage);
+            currentWetnessStage = stage;
+        }
+
+        // 단계별 속도 배율 및 가속도 설정
+        float speedMult;
+        switch (stage)
+        {
+            case WetnessStage.Damp:
+                speedMult = stage1SpeedMult; 
+                agent.acceleration = normalAcceleration;
+                Debug.Log("Damp mode");
+                break;
+            case WetnessStage.Soaked: 
+                speedMult = stage2SpeedMult; // 속도 0.8x
+                agent.acceleration = slideAcceleration; // 방향 전환 둔화 → 미끄럼 표현
+                Debug.Log("Soaked mode");
+                break;
+            case WetnessStage.Overloaded:
+                speedMult = stage2SpeedMult; 
+                agent.acceleration = slideAcceleration;
+                Debug.Log("Overload mode");
+                break;
+            default: // Dry
+                speedMult = 1f;
+                agent.acceleration = normalAcceleration;
+                break;
+        }
+
+        float baseSpeed;
         switch (currentState)
         {
-            case GuardState.Alert: currentBaseSpeed = baseAlertSpeed; break;
-            case GuardState.Chase: currentBaseSpeed = baseChaseSpeed; break;
-            default: currentBaseSpeed = basePatrolSpeed; break;
+            case GuardState.Alert: baseSpeed = baseAlertSpeed; break;
+            case GuardState.Chase: baseSpeed = baseChaseSpeed; break;
+            default: baseSpeed = basePatrolSpeed; break;
         }
-        
-        agent.speed = currentBaseSpeed * speedMultiplier;
+
+        agent.speed = baseSpeed * speedMult;
     }
 
     void SetDestination()

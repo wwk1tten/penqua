@@ -31,25 +31,6 @@ public class CapsuleController : MonoBehaviour
         transform.position = new Vector3(startPosition.x, newY, startPosition.z);
     }
     
-    public void Interact(GameObject player)
-    {
-        // 1. 데이터 생성
-        CapsuleData newData = new CapsuleData
-        {
-            capsuleID = this.capsuleID,
-            animalPrefab = this.animalPrefab,
-            capsuleIcon = this.capsuleIcon
-        };
-
-        // 2. 플레이어의 인벤토리에 데이터 전달
-        if (player.TryGetComponent(out PlayerInventory inventory))
-        {
-            inventory.AddCapsule(newData);
-        }
-
-        // 3. 게임 매니저 알림 및 파괴
-        GameManager.Instance.OnCapsuleCollected(capsuleID);
-        Destroy(gameObject);
-    }
+    // 획득 로직은 CapsulePickupEffect(IPickupEffect)가 담당합니다.
     
 }

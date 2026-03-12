@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.UI; // UI 컴포넌트를 사용하기 위해 필수!
+using UnityEngine.UI; 
 
 public class WaterUIController : MonoBehaviour
 {

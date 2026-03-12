@@ -744,13 +744,6 @@ namespace StarterAssets
                 //EnterPuddleState(other.GetComponent<Collider>());
             }
 
-            if ((waterMask & (1 << other.gameObject.layer)) != 0)
-            {
-                _isSwimming = true;
-                _animator.SetBool("isSwimming", _isSwimming);
-                _canReleaseAnimal = true;
-            }
-
             else if (other.CompareTag("WaterPuddle") && !isStunned)
             {
                 _isOnPuddle = true;
@@ -780,14 +773,7 @@ namespace StarterAssets
                 if (_currentInteractable == interactable)
                 {
                     _currentInteractable = null;
-                    // UIManager.Instance.ShowInteractionPrompt(false);
                 }
-            }
-
-            if ((waterMask & (1 << other.gameObject.layer)) != 0)
-            {
-                _isSwimming = false;
-                _canReleaseAnimal = false;
             }
 
             else if (other.CompareTag("WaterPuddle"))
@@ -809,6 +795,25 @@ namespace StarterAssets
         public void SetControlState(bool canControl)
         {
             isControlFrozen = !canControl;
+        }
+
+        public void SetSwimming(bool state)
+        {
+            // 현재 상태와 동일한 값이 들어오면 불필요한 연산을 막습니다.
+            if (_isSwimming == state) return;
+
+            _isSwimming = state;
+            
+            // 캡슐 방생 가능 여부를 수영 상태와 완벽히 동기화합니다.
+            _canReleaseAnimal = state;
+
+            // 애니메이터 안전 검사 후 파라미터 업데이트
+            if (_animator != null)
+            {
+                _animator.SetBool("isSwimming", _isSwimming);
+            }
+
+            Debug.Log($"수영 상태 변경: {state}");
         }
 
         public void StartClimbing(float speed)

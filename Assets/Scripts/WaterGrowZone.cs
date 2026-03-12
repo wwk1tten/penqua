@@ -28,8 +28,16 @@ public class WaterGrowZone : MonoBehaviour
 
         if (other.TryGetComponent(out ThirdPersonController pc))
         {
-            //pc._isSwimming = true);
+            pc.SetSwimming(true);
         }
+    }
 
+    private void OnTriggerExit(Collider other)
+    {
+        // 나간 것이 플레이어라면 수영 상태를 끕니다.
+        if (other.CompareTag("Player") && other.TryGetComponent(out ThirdPersonController pc))
+        {
+            pc.SetSwimming(false);
+        }
     }
 }
