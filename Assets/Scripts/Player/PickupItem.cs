@@ -10,6 +10,8 @@ public class PickupItem : MonoBehaviour, IInteractable
     [Header("UI 연결 (선택 사항)")]
     public GameObject bubblePressE; // "E키를 누르세요" 안내 버블
 
+    private bool collected = false;
+
     private void Start()
     {
         if (bubblePressE != null) bubblePressE.SetActive(false);
@@ -60,6 +62,9 @@ public class PickupItem : MonoBehaviour, IInteractable
     // ==========================================
     private void CollectItem(GameObject player)
     {
+        if (collected) return;
+        collected = true;
+
         if (TryGetComponent(out IPickupEffect effect))
         {
             effect.OnPickup(player);

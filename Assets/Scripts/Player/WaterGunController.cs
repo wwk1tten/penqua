@@ -10,7 +10,10 @@ public class WaterGunController : MonoBehaviour
     [Header("무기 장착")]
     public bool hasWeapon = false;
     public GameObject handGunModel;
-    public GameObject backGunModel;
+
+    [Header("캐릭터 회전")]
+    public Transform characterBody; // 회전시킬 캐릭터 바디 Transform 직접 지정
+    public float aimRotationSpeed = 720f;
 
     [Header("발사 및 물탱크 설정")]
     public float shootRange = 50f;
@@ -35,6 +38,7 @@ public class WaterGunController : MonoBehaviour
 
     [Header("VFX & SFX")]
     public ParticleSystem waterStreamEffect;
+    public Vector3 streamRotationOffset = new(-90f, 0f, 0f); // 파티클 이미션 축 보정
     public GameObject waterSplashEffect;
     public AudioSource audioSource;
     public AudioClip shootSound;
@@ -45,8 +49,7 @@ public class WaterGunController : MonoBehaviour
     private Animator playerAnimator;
     private int animIDisReloading;
 
-    void Start()
-    {
+    void Start(){
         InitializeWeapon();
         currentWater = maxWater;
         
@@ -54,30 +57,22 @@ public class WaterGunController : MonoBehaviour
         animIDisReloading = Animator.StringToHash("isReloading");
     }
 
-    void Update()
-    {
+    void Update(){
         if (!hasWeapon) return;
-
-        // 1. 모델 동기화 (우클릭 조준 시)
-        bool isAiming = Input.GetMouseButton(1);
-        HandleWeaponModel(isAiming);
 
         if (isReloading) return;
 
-        // 2. 장전 처리
-        if (Input.GetKeyDown(KeyCode.R) && isNearWaterSource && currentWater < maxWater)
-        {
+        // 1. 장전 처리
+        if (Input.GetKeyDown(KeyCode.R) && isNearWaterSource && currentWater < maxWater){
             StartCoroutine(ReloadRoutine());
             return;
         }
 
-        // 3. 발사 처리 (우클릭 조준 + 좌클릭 발사)
-        if (isAiming && Input.GetMouseButton(0) && currentWater > 0)
-        {
+        // 2. 발사 처리 (좌클릭)
+        if (Input.GetMouseButton(0) && currentWater > 0){
             HandleShooting();
         }
-        else
-        {
+        else{
             StopShootingVFX();
         }
     }
@@ -86,14 +81,11 @@ public class WaterGunController : MonoBehaviour
     // 핵심 로직 분리 영역
     // ==========================================
 
-    private void HandleWeaponModel(bool isAiming)
-    {
-        if (handGunModel.activeSelf != isAiming) handGunModel.SetActive(isAiming);
-        if (backGunModel.activeSelf == isAiming) backGunModel.SetActive(!isAiming);
-    }
-
     private void HandleShooting()
     {
+        // 캐릭터를 카메라 수평 방향으로 회전
+        RotateCharacterTowardCamera();
+
         // 물 지속 소모
         currentWater = Mathf.Clamp(currentWater - (waterConsumptionRate * Time.deltaTime), 0, maxWater);
 
@@ -126,7 +118,11 @@ public class WaterGunController : MonoBehaviour
         // 타격 지점 물보라
         if (waterSplashEffect != null)
         {
-            Instantiate(waterSplashEffect, hit.point, Quaternion.LookRotation(hit.normal));
+            Vector3 incomingDir = gunMuzzle != null
+                ? (hit.point - gunMuzzle.position).normalized
+                : -hit.normal;
+            Quaternion splashRot = Quaternion.LookRotation(Vector3.Reflect(incomingDir, hit.normal));
+            Instantiate(waterSplashEffect, hit.point, splashRot);
         }
 
         PlaySound(shootSound);
@@ -169,6 +165,17 @@ public class WaterGunController : MonoBehaviour
         SoundEmitter.MakeSound(transform.position, 5f);
     }
 
+    private void RotateCharacterTowardCamera()
+    {
+        Vector3 flatForward = Vector3.ProjectOnPlane(mainCamera.transform.forward, Vector3.up);
+        if (flatForward.sqrMagnitude < 0.01f) return;
+
+        if (characterBody == null) return;
+
+        Quaternion targetRot = Quaternion.LookRotation(flatForward);
+        characterBody.rotation = Quaternion.RotateTowards(characterBody.rotation, targetRot, aimRotationSpeed * Time.deltaTime);
+    }
+
     // ==========================================
     // 시각 및 사운드 효과 유틸리티
     // ==========================================
@@ -177,23 +184,19 @@ public class WaterGunController : MonoBehaviour
     {
         if (waterStreamEffect == null) return;
 
-        if (gunMuzzle != null)
-        {
-            waterStreamEffect.transform.position = gunMuzzle.position;
-        }
+        Vector3 startPos = gunMuzzle != null ? gunMuzzle.position : transform.position;
+        Vector3 targetPoint = hasHit ? hit.point : ray.GetPoint(shootRange);
+
+        Quaternion shootRot = Quaternion.LookRotation(targetPoint - startPos) * Quaternion.Euler(streamRotationOffset);
+        waterStreamEffect.transform.SetPositionAndRotation(startPos, shootRot);
 
         if (!waterStreamEffect.isPlaying) waterStreamEffect.Play();
-
-        Vector3 targetPoint = hasHit ? hit.point : ray.GetPoint(shootRange);
-        waterStreamEffect.transform.rotation = Quaternion.LookRotation(targetPoint - waterStreamEffect.transform.position);
     }
 
     private void StopShootingVFX()
     {
         if (waterStreamEffect != null && waterStreamEffect.isPlaying)
-        {
             waterStreamEffect.Stop();
-        }
     }
 
     private void PlaySound(AudioClip clip)
@@ -226,14 +229,14 @@ public class WaterGunController : MonoBehaviour
     private void InitializeWeapon()
     {
         mainCamera = mainCamera ?? Camera.main;
-        waterStreamEffect?.Stop();
-        HandleWeaponModel(false);
+        if (waterStreamEffect != null) waterStreamEffect.Stop();
+        if (handGunModel != null) handGunModel.SetActive(hasWeapon);
     }
 
     public void PickupWaterGun()
     {
         hasWeapon = true;
-        HandleWeaponModel(false);
+        if (handGunModel != null) handGunModel.SetActive(true);
         Debug.Log("물총 획득 완료!");
     }
 
