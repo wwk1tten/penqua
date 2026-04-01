@@ -113,6 +113,7 @@ public class GuardPatrol : MonoBehaviour
         _animIDSearch = Animator.StringToHash("isSearching");
 
         agent.speed = patrolSpeed;
+        agent.updateRotation = false; // 회전을 코드에서 직접 제어 (NavMesh 회전 충돌 방지)
         alertIcon.SetAlert(false);
         susIcon.SetAlert(false);
 
@@ -153,7 +154,10 @@ public class GuardPatrol : MonoBehaviour
         // 3. 공격 체크 (상태와 무관하게 사거리+시야 되면 공격)
         CheckAndAttack();
 
-        // 4. 상태 머신 실행
+        // 4. 이동 중일 때 부드러운 회전 (NavMesh velocity 기반)
+        SmoothRotationByVelocity();
+
+        // 5. 상태 머신 실행
         switch (currentState)
         {
             case GuardState.Patrol:
@@ -179,6 +183,18 @@ public class GuardPatrol : MonoBehaviour
     // =========================================================
     // 4. 기능별 분리 함수들 
     // =========================================================
+
+    // NavMesh velocity 기반 회전 (이동 중에만 작동 - Alert/공격 사거리 내 수동 회전과 공존)
+    void SmoothRotationByVelocity()
+    {
+        Vector3 velocity = agent.velocity;
+        velocity.y = 0;
+        if (velocity.sqrMagnitude > 0.1f)
+        {
+            Quaternion targetRot = Quaternion.LookRotation(velocity.normalized);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, 360f * Time.deltaTime);
+        }
+    }
 
     // [핵심] 공격 가능 여부 체크 및 실행
     void CheckAndAttack()

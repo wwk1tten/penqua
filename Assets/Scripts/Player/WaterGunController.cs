@@ -38,7 +38,7 @@ public class WaterGunController : MonoBehaviour
 
     [Header("VFX & SFX")]
     public ParticleSystem waterStreamEffect;
-    public Vector3 streamRotationOffset = new(-90f, 0f, 0f); // 파티클 이미션 축 보정
+    public Vector3 streamRotationOffset = new(90f, 0f, 0f); // Shape 모듈 방출 축 보정 (Y축 방출 파티클: 90,0,0 / Z축 방출: 0,0,0)
     public GameObject waterSplashEffect;
     public AudioSource audioSource;
     public AudioClip shootSound;
@@ -187,8 +187,13 @@ public class WaterGunController : MonoBehaviour
         Vector3 startPos = gunMuzzle != null ? gunMuzzle.position : transform.position;
         Vector3 targetPoint = hasHit ? hit.point : ray.GetPoint(shootRange);
 
-        Quaternion shootRot = Quaternion.LookRotation(targetPoint - startPos) * Quaternion.Euler(streamRotationOffset);
+        // transform은 로컬 Z가 목표를 향하도록 회전 (offset 없이)
+        Quaternion shootRot = Quaternion.LookRotation(targetPoint - startPos);
         waterStreamEffect.transform.SetPositionAndRotation(startPos, shootRot);
+
+        // Shape 모듈 회전으로 방출 축 보정 (파티클이 실제로 날아가는 방향 결정)
+        var shape = waterStreamEffect.shape;
+        shape.rotation = streamRotationOffset;
 
         if (!waterStreamEffect.isPlaying) waterStreamEffect.Play();
     }
